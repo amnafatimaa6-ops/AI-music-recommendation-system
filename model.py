@@ -20,13 +20,13 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 # -------------------------
 MOOD_MAP = {
     "sad": "melancholy emotional slow acoustic heartbreak piano soft",
-    "happy": "joyful energetic upbeat dance fun positive bright festival",
-    "chill": "calm relaxed lo-fi ambient soft peaceful study sleep smooth",
+    "happy": "joyful energetic upbeat dance fun positive bright",
+    "chill": "calm relaxed lo-fi ambient soft peaceful study sleep",
     "energetic": "high energy fast hype workout intense bass aggressive"
 }
 
 # -------------------------
-# EXPAND QUERY (IMPORTANT)
+# QUERY EXPANSION
 # -------------------------
 def expand_query(query, mode):
 
@@ -34,22 +34,20 @@ def expand_query(query, mode):
         return query + " similar artists songs albums music"
 
     if mode == "genre":
-        return query + " top songs artists playlist hits"
+        return query + " top songs playlist hits artists"
 
     return MOOD_MAP.get(query.lower(), query)
 
 # -------------------------
-# ARTIST EXPANSION POOL
+# ARTIST POOL EXPANSION
 # -------------------------
 def get_artist_pool(selected_artist):
 
     genres = df[df['track_artist'] == selected_artist]['playlist_genre'].unique()
-    pool = df[df['playlist_genre'].isin(genres)]
-
-    return pool
+    return df[df['playlist_genre'].isin(genres)]
 
 # -------------------------
-# FINAL RECOMMENDER
+# FINAL RECOMMENDER ENGINE
 # -------------------------
 def search_music(query, mode="mood", top_n=10):
 
@@ -60,6 +58,7 @@ def search_music(query, mode="mood", top_n=10):
 
     audio_boost = df['mood_score'].values
 
+    # MAIN SCORING
     final_score = 0.7 * sim + 0.3 * audio_boost
 
     # -------------------------
