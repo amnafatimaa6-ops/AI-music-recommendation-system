@@ -4,20 +4,29 @@ import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
+# -------------------------
+# LOAD DATA
+# -------------------------
 df = pd.read_csv("music_df.csv")
 text_embeddings = pickle.load(open("text_embeddings.pkl", "rb"))
 
+# -------------------------
+# TRANSFORMER MODEL
+# -------------------------
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
+# -------------------------
+# MOOD MAP
+# -------------------------
 MOOD_MAP = {
-    "sad": "melancholy emotional slow acoustic heartbreak piano",
-    "happy": "joyful energetic upbeat dance fun positive",
-    "chill": "calm relaxed lo-fi ambient soft peaceful",
-    "energetic": "high energy fast hype workout intense bass"
+    "sad": "melancholy emotional slow acoustic heartbreak piano soft",
+    "happy": "joyful energetic upbeat dance fun positive bright festival",
+    "chill": "calm relaxed lo-fi ambient soft peaceful study sleep smooth",
+    "energetic": "high energy fast hype workout intense bass aggressive"
 }
 
 # -------------------------
-# SMART EXPANSION ENGINE
+# EXPAND QUERY (IMPORTANT)
 # -------------------------
 def expand_query(query, mode):
 
@@ -25,9 +34,19 @@ def expand_query(query, mode):
         return query + " similar artists songs albums music"
 
     if mode == "genre":
-        return query + " top artists songs albums playlist"
+        return query + " top songs artists playlist hits"
 
     return MOOD_MAP.get(query.lower(), query)
+
+# -------------------------
+# ARTIST EXPANSION POOL
+# -------------------------
+def get_artist_pool(selected_artist):
+
+    genres = df[df['track_artist'] == selected_artist]['playlist_genre'].unique()
+    pool = df[df['playlist_genre'].isin(genres)]
+
+    return pool
 
 # -------------------------
 # FINAL RECOMMENDER
@@ -43,20 +62,34 @@ def search_music(query, mode="mood", top_n=10):
 
     final_score = 0.7 * sim + 0.3 * audio_boost
 
-    top_idx = final_score.argsort()[::-1]
+    # -------------------------
+    # SMART POOL
+    # -------------------------
+    if mode == "artist":
+        pool = get_artist_pool(query)
+        idxs = pool.index
+    else:
+        idxs = np.arange(len(df))
+
+    ranked = sorted(idxs, key=lambda i: final_score[i], reverse=True)
 
     results = []
 
     seen_artists = set()
     seen_genres = set()
 
-    for i in top_idx:
+    for i in ranked:
 
         artist = df.iloc[i]['track_artist']
         genre = df.iloc[i]['playlist_genre']
 
-        # REMOVE DUPLICATES
+        # -------------------------
+        # DIVERSITY CONTROL
+        # -------------------------
         if artist in seen_artists:
+            continue
+
+        if len(seen_genres) >= 2 and genre in seen_genres:
             continue
 
         seen_artists.add(artist)
