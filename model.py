@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
+from collections import Counter
 
 # -------------------------
 # LOAD DATA
@@ -11,7 +12,7 @@ df = pd.read_csv("music_df.csv")
 text_embeddings = pickle.load(open("text_embeddings.pkl", "rb"))
 
 # -------------------------
-# TRANSFORMER MODEL
+# TRANSFORMER
 # -------------------------
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
@@ -26,7 +27,7 @@ MOOD_MAP = {
 }
 
 # -------------------------
-# QUERY EXPANSION
+# EXPAND QUERY
 # -------------------------
 def expand_query(query, mode):
 
@@ -39,15 +40,14 @@ def expand_query(query, mode):
     return MOOD_MAP.get(query.lower(), query)
 
 # -------------------------
-# ARTIST POOL EXPANSION
+# ARTIST EXPANSION
 # -------------------------
 def get_artist_pool(selected_artist):
-
     genres = df[df['track_artist'] == selected_artist]['playlist_genre'].unique()
     return df[df['playlist_genre'].isin(genres)]
 
 # -------------------------
-# FINAL RECOMMENDER ENGINE
+# FINAL RECOMMENDER (FIXED VERSION)
 # -------------------------
 def search_music(query, mode="mood", top_n=10):
 
@@ -58,8 +58,10 @@ def search_music(query, mode="mood", top_n=10):
 
     audio_boost = df['mood_score'].values
 
-    # MAIN SCORING
-    final_score = 0.7 * sim + 0.3 * audio_boost
+    # -------------------------
+    # BASE SCORE
+    # -------------------------
+    final_score = 0.55 * sim + 0.25 * audio_boost
 
     # -------------------------
     # SMART POOL
@@ -72,32 +74,33 @@ def search_music(query, mode="mood", top_n=10):
 
     ranked = sorted(idxs, key=lambda i: final_score[i], reverse=True)
 
+    # -------------------------
+    # DIVERSITY CONTROL
+    # -------------------------
     results = []
-
     seen_artists = set()
-    seen_genres = set()
+    genre_counts = Counter()
 
     for i in ranked:
 
         artist = df.iloc[i]['track_artist']
         genre = df.iloc[i]['playlist_genre']
 
-        # -------------------------
-        # DIVERSITY CONTROL
-        # -------------------------
+        # avoid duplicates
         if artist in seen_artists:
             continue
 
-        if len(seen_genres) >= 2 and genre in seen_genres:
-            continue
+        # genre penalty (ANTI CLUSTERING FIX)
+        penalty = genre_counts[genre] * 0.05
+        score = final_score[i] - penalty
 
         seen_artists.add(artist)
-        seen_genres.add(genre)
+        genre_counts[genre] += 1
 
         results.append({
             "song": artist,
             "genre": genre,
-            "score": round(float(final_score[i]), 3)
+            "score": round(float(score), 3)
         })
 
         if len(results) == top_n:
