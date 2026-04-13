@@ -3,52 +3,26 @@ import numpy as np
 import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
-from collections import Counter
 
-# -------------------------
-# LOAD DATA
-# -------------------------
 df = pd.read_csv("music_df.csv")
 text_embeddings = pickle.load(open("text_embeddings.pkl", "rb"))
 
-# -------------------------
-# TRANSFORMER
-# -------------------------
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# -------------------------
-# MOOD MAP
-# -------------------------
 MOOD_MAP = {
-    "sad": "melancholy emotional slow acoustic heartbreak piano soft",
-    "happy": "joyful energetic upbeat dance fun positive bright",
-    "chill": "calm relaxed lo-fi ambient soft peaceful study sleep",
-    "energetic": "high energy fast hype workout intense bass aggressive"
+    "sad": "melancholy emotional slow acoustic piano soft",
+    "happy": "joyful energetic upbeat dance fun bright",
+    "chill": "lo-fi ambient calm peaceful study sleep",
+    "energetic": "high energy fast hype workout bass aggressive"
 }
 
-# -------------------------
-# EXPAND QUERY
-# -------------------------
 def expand_query(query, mode):
-
     if mode == "artist":
         return query + " similar artists songs albums music"
-
     if mode == "genre":
-        return query + " top songs playlist hits artists"
-
+        return query + " top songs playlist hits"
     return MOOD_MAP.get(query.lower(), query)
 
-# -------------------------
-# ARTIST EXPANSION
-# -------------------------
-def get_artist_pool(selected_artist):
-    genres = df[df['track_artist'] == selected_artist]['playlist_genre'].unique()
-    return df[df['playlist_genre'].isin(genres)]
-
-# -------------------------
-# FINAL RECOMMENDER (FIXED VERSION)
-# -------------------------
 def search_music(query, mode="mood", top_n=10):
 
     expanded_query = expand_query(query, mode)
@@ -56,46 +30,38 @@ def search_music(query, mode="mood", top_n=10):
     query_vec = model.encode([expanded_query])
     sim = cosine_similarity(query_vec, text_embeddings)[0]
 
-    audio_boost = df['mood_score'].values
+    audio = df['mood_score'].values
 
-    # -------------------------
-    # BASE SCORE
-    # -------------------------
-    final_score = 0.55 * sim + 0.25 * audio_boost
+    # NORMALIZED SCORING (IMPORTANT FIX)
+    sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
+    audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
-    # -------------------------
-    # SMART POOL
-    # -------------------------
-    if mode == "artist":
-        pool = get_artist_pool(query)
-        idxs = pool.index
-    else:
-        idxs = np.arange(len(df))
+    final_score = 0.6 * sim + 0.4 * audio
 
-    ranked = sorted(idxs, key=lambda i: final_score[i], reverse=True)
+    idxs = np.argsort(final_score)[::-1]
 
-    # -------------------------
-    # DIVERSITY CONTROL
-    # -------------------------
     results = []
-    seen_artists = set()
-    genre_counts = Counter()
+    seen = set()
 
-    for i in ranked:
+    anchor_artist = query
+
+    for i in idxs:
 
         artist = df.iloc[i]['track_artist']
         genre = df.iloc[i]['playlist_genre']
 
-        # avoid duplicates
-        if artist in seen_artists:
+        if artist in seen:
             continue
 
-        # genre penalty (ANTI CLUSTERING FIX)
-        penalty = genre_counts[genre] * 0.05
-        score = final_score[i] - penalty
+        # anchor lock for artist mode
+        if mode == "artist" and artist == anchor_artist:
+            boost = 0.2
+        else:
+            boost = 0
 
-        seen_artists.add(artist)
-        genre_counts[genre] += 1
+        score = final_score[i] + boost
+
+        seen.add(artist)
 
         results.append({
             "song": artist,
