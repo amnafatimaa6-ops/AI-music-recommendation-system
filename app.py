@@ -2,9 +2,14 @@ import streamlit as st
 import requests
 from model import search_music, df
 
+# -------------------------
+# PAGE CONFIG
+# -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
+
+st.markdown("Transformer NLP + Playlist Intelligence + Explainable AI")
 
 # -------------------------
 # DEEZER API (ALBUM + PREVIEW)
@@ -24,11 +29,9 @@ def get_deezer(query):
     }
 
 # -------------------------
-# MODE SELECTION
+# MODE
 # -------------------------
 mode = st.radio("Choose Mode", ["🎭 Mood", "🎤 Artist", "🎼 Genre"])
-
-query = ""
 
 if mode == "🎭 Mood":
     query = st.text_input("Enter mood (sad, happy, chill, energetic)")
