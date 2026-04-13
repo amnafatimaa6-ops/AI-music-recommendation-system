@@ -9,7 +9,7 @@ from model import search_music, df
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Playlist Intelligence + Discovery Engine")
+st.markdown("Transformer NLP + Playlist Intelligence + Balanced Discovery Engine")
 
 # -------------------------
 # DEEZER API
@@ -29,7 +29,7 @@ def get_deezer(query):
     }
 
 # -------------------------
-# MODE SELECTION
+# MODE
 # -------------------------
 mode = st.radio("Choose Mode", ["🎭 Mood", "🎤 Artist", "🎼 Genre"])
 
@@ -80,9 +80,3 @@ if st.button("Recommend 🎧"):
                 st.image(deezer["image"], use_container_width=True)
                 if deezer["preview"]:
                     st.audio(deezer["preview"])
-
-    # -------------------------
-    # DISCOVERY LAYER (FINAL POLISH)
-    # -------------------------
-    st.markdown("---")
-    st.info("✨ Discovery mode enabled: slight variation added for non-repetitive recommendations")
