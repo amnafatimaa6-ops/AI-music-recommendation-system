@@ -1,15 +1,18 @@
 import streamlit as st
 import requests
-from model import search_by_mood, df
-
-st.set_page_config(page_title="AI Music Recommender", layout="wide")
-
-st.title("🎧 AI Music Recommender System")
-
-st.markdown("Transformer NLP + Explainable AI + Music Preview 🎵")
+from model import search_by_mood, df, update_user_profile
 
 # -------------------------
-# DEEZER API (RESTORED)
+# PAGE CONFIG
+# -------------------------
+st.set_page_config(page_title="AI Music Recommender", layout="wide")
+
+st.title("🎧 AI Music Recommender (Final Boss Mode)")
+
+st.markdown("Transformer NLP + Explainable AI + Adaptive Learning System")
+
+# -------------------------
+# DEEZER API (ALBUM + PREVIEW)
 # -------------------------
 def get_deezer(query):
     url = f"https://api.deezer.com/search?q={query}"
@@ -24,15 +27,13 @@ def get_deezer(query):
         "title": track["title"],
         "artist": track["artist"]["name"],
         "image": track["album"]["cover_big"],
-        "preview": track["preview"]   # 🎵 AUDIO FIX
+        "preview": track["preview"]
     }
 
 # -------------------------
 # MODE SELECTION
 # -------------------------
 mode = st.radio("Choose Mode", ["🎭 Mood Search", "🎤 Artist Search", "🎼 Genre Search"])
-
-query = ""
 
 if mode == "🎭 Mood Search":
     query = st.text_input("Describe mood (sad, happy, chill, energetic)")
@@ -50,7 +51,7 @@ if st.button("Recommend 🎧"):
 
     results = search_by_mood(query)
 
-    st.subheader("🎵 Recommended Songs")
+    st.subheader("🎵 Recommendations")
 
     cols = st.columns(3)
 
@@ -76,14 +77,22 @@ if st.button("Recommend 🎧"):
             </div>
             """, unsafe_allow_html=True)
 
-            # -------------------------
-            # ALBUM COVER (FIXED)
-            # -------------------------
             if deezer:
                 st.image(deezer["image"], use_container_width=True)
 
-                # -------------------------
-                # AUDIO PLAYER (FIXED)
-                # -------------------------
                 if deezer["preview"]:
                     st.audio(deezer["preview"])
+
+            # -------------------------
+            # USER FEEDBACK LOOP (FINAL BOSS FEATURE)
+            # -------------------------
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button(f"👍 Like {i}", key=f"like_{i}"):
+                    update_user_profile(r["genre"], r["song"])
+                    st.success("Learning your taste...")
+
+            with col2:
+                if st.button(f"👎 Skip {i}", key=f"skip_{i}"):
+                    st.info("Refining recommendations...")
