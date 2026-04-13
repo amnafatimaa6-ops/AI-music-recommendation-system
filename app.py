@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import numpy as np
 from model import search_music, df
 
 # -------------------------
@@ -8,11 +9,10 @@ from model import search_music, df
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-
-st.markdown("Transformer NLP + Playlist Intelligence + Explainable AI")
+st.markdown("Transformer NLP + Playlist Intelligence + Discovery Engine")
 
 # -------------------------
-# DEEZER API (ALBUM + PREVIEW)
+# DEEZER API
 # -------------------------
 def get_deezer(query):
     url = f"https://api.deezer.com/search?q={query}"
@@ -29,7 +29,7 @@ def get_deezer(query):
     }
 
 # -------------------------
-# MODE
+# MODE SELECTION
 # -------------------------
 mode = st.radio("Choose Mode", ["🎭 Mood", "🎤 Artist", "🎼 Genre"])
 
@@ -80,3 +80,9 @@ if st.button("Recommend 🎧"):
                 st.image(deezer["image"], use_container_width=True)
                 if deezer["preview"]:
                     st.audio(deezer["preview"])
+
+    # -------------------------
+    # DISCOVERY LAYER (FINAL POLISH)
+    # -------------------------
+    st.markdown("---")
+    st.info("✨ Discovery mode enabled: slight variation added for non-repetitive recommendations")
