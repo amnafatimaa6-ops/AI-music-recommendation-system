@@ -2,31 +2,17 @@ import streamlit as st
 import requests
 from model import search_by_mood, df
 
+# -------------------------
+# PAGE CONFIG
+# -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
-st.title("🎧 AI Music Recommender (Transformer + Deezer)")
+st.title("🎧 AI Music Recommender System")
+
+st.markdown("Built with Transformer NLP + Hybrid Recommendation Engine")
 
 # -------------------------
-# DEEZER API
-# -------------------------
-def get_deezer(query):
-    url = f"https://api.deezer.com/search?q={query}"
-    res = requests.get(url).json()
-
-    if "data" not in res or len(res["data"]) == 0:
-        return None
-
-    track = res["data"][0]
-
-    return {
-        "title": track["title"],
-        "artist": track["artist"]["name"],
-        "image": track["album"]["cover_big"],
-        "preview": track["preview"]
-    }
-
-# -------------------------
-# UI MODE SELECTION
+# MODE SELECTION
 # -------------------------
 mode = st.radio("Choose Mode", ["🎭 Mood Search", "🎤 Artist Search", "🎼 Genre Search"])
 
@@ -48,19 +34,26 @@ if st.button("Recommend 🎧"):
 
     results = search_by_mood(query)
 
+    st.subheader("🎵 Recommended Songs")
+
     cols = st.columns(3)
 
     for i, r in enumerate(results):
 
-        deezer = get_deezer(r["song"])
-
         with cols[i % 3]:
-            st.markdown("### 🎵 " + r["song"])
-            st.write("🎼 Genre:", r["genre"])
-            st.write("⭐ Score:", r["score"])
 
-            if deezer:
-                st.image(deezer["image"])
-
-                if deezer["preview"]:
-                    st.audio(deezer["preview"])
+            st.markdown(f"""
+            <div style="
+                padding:15px;
+                border-radius:15px;
+                background:#111;
+                color:white;
+                margin-bottom:15px;
+                box-shadow:0px 0px 12px rgba(255,255,255,0.1);
+            ">
+                <h4>🎵 {r['song']}</h4>
+                <p><b>Genre:</b> {r['genre']}</p>
+                <p><b>Score:</b> {r['score']}</p>
+                <p style="color:lightgray;">💡 {r['why']}</p>
+            </div>
+            """, unsafe_allow_html=True)
