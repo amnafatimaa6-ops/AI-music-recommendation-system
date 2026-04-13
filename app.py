@@ -6,9 +6,9 @@ st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender (Transformer + Deezer)")
 
-# ----------------------
+# -------------------------
 # DEEZER API
-# ----------------------
+# -------------------------
 def get_deezer(query):
     url = f"https://api.deezer.com/search?q={query}"
     res = requests.get(url).json()
@@ -25,9 +25,9 @@ def get_deezer(query):
         "preview": track["preview"]
     }
 
-# ----------------------
-# MODE SELECTION
-# ----------------------
+# -------------------------
+# UI MODE SELECTION
+# -------------------------
 mode = st.radio("Choose Mode", ["🎭 Mood Search", "🎤 Artist Search", "🎼 Genre Search"])
 
 query = ""
@@ -41,9 +41,9 @@ elif mode == "🎤 Artist Search":
 elif mode == "🎼 Genre Search":
     query = st.selectbox("Select Genre", sorted(df['playlist_genre'].unique()))
 
-# ----------------------
+# -------------------------
 # RECOMMEND BUTTON
-# ----------------------
+# -------------------------
 if st.button("Recommend 🎧"):
 
     results = search_by_mood(query)
