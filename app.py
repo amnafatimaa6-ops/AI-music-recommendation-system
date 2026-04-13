@@ -2,22 +2,25 @@ import streamlit as st
 import requests
 from model import search_music, df
 
+# -------------------------
+# CONFIG
+# -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Playlist Intelligence + Production Engine")
+st.markdown("Transformer NLP + Balanced AI + Discovery Engine")
 
 # -------------------------
 # DEEZER API
 # -------------------------
 def get_deezer(song):
     url = f"https://api.deezer.com/search?q={song}"
-    r = requests.get(url).json()
+    res = requests.get(url).json()
 
-    if "data" not in r or len(r["data"]) == 0:
+    if "data" not in res or len(res["data"]) == 0:
         return None
 
-    t = r["data"][0]
+    t = res["data"][0]
 
     return {
         "image": t["album"]["cover_big"],
@@ -25,7 +28,7 @@ def get_deezer(song):
     }
 
 # -------------------------
-# MODE UI
+# MODE
 # -------------------------
 mode = st.radio("Choose Mode", ["🎭 Mood", "🎤 Artist", "🎼 Genre"])
 
@@ -42,7 +45,7 @@ elif mode == "🎼 Genre":
     mode_key = "genre"
 
 # -------------------------
-# RECOMMEND BUTTON
+# BUTTON
 # -------------------------
 if st.button("Generate Playlist 🎧"):
 
@@ -62,7 +65,7 @@ if st.button("Generate Playlist 🎧"):
             <div style="
                 padding:15px;
                 border-radius:15px;
-                background:#0f0f0f;
+                background:#111;
                 color:white;
                 margin-bottom:15px;
             ">
@@ -74,4 +77,5 @@ if st.button("Generate Playlist 🎧"):
 
             if deezer:
                 st.image(deezer["image"], use_container_width=True)
-                st.audio(deezer["preview"])
+                if deezer["preview"]:
+                    st.audio(deezer["preview"])
