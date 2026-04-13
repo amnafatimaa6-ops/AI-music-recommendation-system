@@ -1,27 +1,23 @@
 import streamlit as st
 import requests
-import numpy as np
 from model import search_music, df
 
-# -------------------------
-# PAGE CONFIG
-# -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Playlist Intelligence + Balanced Discovery Engine")
+st.markdown("Transformer NLP + Playlist Intelligence + Production Engine")
 
 # -------------------------
 # DEEZER API
 # -------------------------
-def get_deezer(query):
-    url = f"https://api.deezer.com/search?q={query}"
-    res = requests.get(url).json()
+def get_deezer(song):
+    url = f"https://api.deezer.com/search?q={song}"
+    r = requests.get(url).json()
 
-    if "data" not in res or len(res["data"]) == 0:
+    if "data" not in r or len(r["data"]) == 0:
         return None
 
-    t = res["data"][0]
+    t = r["data"][0]
 
     return {
         "image": t["album"]["cover_big"],
@@ -29,7 +25,7 @@ def get_deezer(query):
     }
 
 # -------------------------
-# MODE
+# MODE UI
 # -------------------------
 mode = st.radio("Choose Mode", ["🎭 Mood", "🎤 Artist", "🎼 Genre"])
 
@@ -48,11 +44,11 @@ elif mode == "🎼 Genre":
 # -------------------------
 # RECOMMEND BUTTON
 # -------------------------
-if st.button("Recommend 🎧"):
+if st.button("Generate Playlist 🎧"):
 
     results = search_music(query, mode_key)
 
-    st.subheader("🎵 Recommendations")
+    st.subheader("🎵 Your AI Playlist")
 
     cols = st.columns(3)
 
@@ -66,7 +62,7 @@ if st.button("Recommend 🎧"):
             <div style="
                 padding:15px;
                 border-radius:15px;
-                background:#111;
+                background:#0f0f0f;
                 color:white;
                 margin-bottom:15px;
             ">
@@ -78,5 +74,4 @@ if st.button("Recommend 🎧"):
 
             if deezer:
                 st.image(deezer["image"], use_container_width=True)
-                if deezer["preview"]:
-                    st.audio(deezer["preview"])
+                st.audio(deezer["preview"])
