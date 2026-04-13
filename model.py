@@ -10,53 +10,49 @@ from sentence_transformers import SentenceTransformer
 df = pd.read_csv("music_df.csv")
 text_embeddings = pickle.load(open("text_embeddings.pkl", "rb"))
 
+# -------------------------
+# MODEL
+# -------------------------
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # -------------------------
-# MOOD MAP
-# -------------------------
-MOOD_MAP = {
-    "sad": "melancholy emotional slow acoustic piano soft",
-    "happy": "joyful energetic upbeat dance fun bright",
-    "chill": "lofi ambient calm peaceful study sleep",
-    "energetic": "high energy fast hype workout bass"
-}
-
-# -------------------------
-# GENRE DISTRIBUTION (KEY FIX)
+# GENRE DISTRIBUTION (for debiasing)
 # -------------------------
 genre_distribution = df['playlist_genre'].value_counts(normalize=True)
 
 # -------------------------
-# QUERY EXPANSION
+# QUERY EXPANSION (CLEAN)
 # -------------------------
 def expand_query(query, mode):
     if mode == "artist":
         return query + " similar artists songs albums music"
     if mode == "genre":
         return query + " playlist top songs artists"
-    return MOOD_MAP.get(query.lower(), query)
+    return query
 
 # -------------------------
 # MAIN RECOMMENDER
 # -------------------------
-def search_music(query, mode="mood", top_n=10):
+def search_music(query, mode="artist", top_n=10):
 
     expanded_query = expand_query(query, mode)
 
+    # Transformer embedding
     query_vec = model.encode([expanded_query])
     sim = cosine_similarity(query_vec, text_embeddings)[0]
 
+    # Audio features
     audio = df['mood_score'].values
 
     # -------------------------
-    # NORMALIZATION (IMPORTANT)
+    # NORMALIZATION
     # -------------------------
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
     audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
     base_score = 0.6 * sim + 0.4 * audio
 
+    # Ranking
     idxs = np.argsort(base_score)[::-1]
 
     results = []
@@ -67,11 +63,14 @@ def search_music(query, mode="mood", top_n=10):
         artist = df.iloc[i]['track_artist']
         genre = df.iloc[i]['playlist_genre']
 
+        # -------------------------
+        # REMOVE DUPLICATES
+        # -------------------------
         if artist in seen_artists:
             continue
 
         # -------------------------
-        # GENRE PENALTY (POP FIX 🔥)
+        # GENRE PENALTY (ANTI-POP BIAS)
         # -------------------------
         penalty = genre_distribution.get(genre, 0)
         score = base_score[i] * (1 - penalty)
@@ -83,7 +82,7 @@ def search_music(query, mode="mood", top_n=10):
             score += 0.2
 
         # -------------------------
-        # RANDOM DISCOVERY (SPOTIFY FEEL)
+        # SMALL RANDOMNESS (DISCOVERY)
         # -------------------------
         score += np.random.uniform(-0.02, 0.02)
 
