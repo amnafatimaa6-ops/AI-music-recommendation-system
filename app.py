@@ -2,14 +2,30 @@ import streamlit as st
 import requests
 from model import search_by_mood, df
 
-# -------------------------
-# PAGE CONFIG
-# -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
 
-st.markdown("Built with Transformer NLP + Hybrid Recommendation Engine")
+st.markdown("Transformer NLP + Explainable AI + Music Preview 🎵")
+
+# -------------------------
+# DEEZER API (RESTORED)
+# -------------------------
+def get_deezer(query):
+    url = f"https://api.deezer.com/search?q={query}"
+    res = requests.get(url).json()
+
+    if "data" not in res or len(res["data"]) == 0:
+        return None
+
+    track = res["data"][0]
+
+    return {
+        "title": track["title"],
+        "artist": track["artist"]["name"],
+        "image": track["album"]["cover_big"],
+        "preview": track["preview"]   # 🎵 AUDIO FIX
+    }
 
 # -------------------------
 # MODE SELECTION
@@ -40,6 +56,8 @@ if st.button("Recommend 🎧"):
 
     for i, r in enumerate(results):
 
+        deezer = get_deezer(r["song"])
+
         with cols[i % 3]:
 
             st.markdown(f"""
@@ -57,3 +75,15 @@ if st.button("Recommend 🎧"):
                 <p style="color:lightgray;">💡 {r['why']}</p>
             </div>
             """, unsafe_allow_html=True)
+
+            # -------------------------
+            # ALBUM COVER (FIXED)
+            # -------------------------
+            if deezer:
+                st.image(deezer["image"], use_container_width=True)
+
+                # -------------------------
+                # AUDIO PLAYER (FIXED)
+                # -------------------------
+                if deezer["preview"]:
+                    st.audio(deezer["preview"])
