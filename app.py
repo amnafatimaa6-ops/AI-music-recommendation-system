@@ -1,15 +1,10 @@
 import streamlit as st
 import requests
-from model import search_by_mood, df, update_user_profile
+from model import search_music, df
 
-# -------------------------
-# PAGE CONFIG
-# -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
-st.title("🎧 AI Music Recommender (Final Boss Mode)")
-
-st.markdown("Transformer NLP + Explainable AI + Adaptive Learning System")
+st.title("🎧 AI Music Recommender System")
 
 # -------------------------
 # DEEZER API (ALBUM + PREVIEW)
@@ -21,35 +16,38 @@ def get_deezer(query):
     if "data" not in res or len(res["data"]) == 0:
         return None
 
-    track = res["data"][0]
+    t = res["data"][0]
 
     return {
-        "title": track["title"],
-        "artist": track["artist"]["name"],
-        "image": track["album"]["cover_big"],
-        "preview": track["preview"]
+        "image": t["album"]["cover_big"],
+        "preview": t["preview"]
     }
 
 # -------------------------
 # MODE SELECTION
 # -------------------------
-mode = st.radio("Choose Mode", ["🎭 Mood Search", "🎤 Artist Search", "🎼 Genre Search"])
+mode = st.radio("Choose Mode", ["🎭 Mood", "🎤 Artist", "🎼 Genre"])
 
-if mode == "🎭 Mood Search":
-    query = st.text_input("Describe mood (sad, happy, chill, energetic)")
+query = ""
 
-elif mode == "🎤 Artist Search":
+if mode == "🎭 Mood":
+    query = st.text_input("Enter mood (sad, happy, chill, energetic)")
+    mode_key = "mood"
+
+elif mode == "🎤 Artist":
     query = st.selectbox("Select Artist", sorted(df['track_artist'].unique()))
+    mode_key = "artist"
 
-elif mode == "🎼 Genre Search":
+elif mode == "🎼 Genre":
     query = st.selectbox("Select Genre", sorted(df['playlist_genre'].unique()))
+    mode_key = "genre"
 
 # -------------------------
 # RECOMMEND BUTTON
 # -------------------------
 if st.button("Recommend 🎧"):
 
-    results = search_by_mood(query)
+    results = search_music(query, mode_key)
 
     st.subheader("🎵 Recommendations")
 
@@ -68,31 +66,14 @@ if st.button("Recommend 🎧"):
                 background:#111;
                 color:white;
                 margin-bottom:15px;
-                box-shadow:0px 0px 12px rgba(255,255,255,0.1);
             ">
                 <h4>🎵 {r['song']}</h4>
-                <p><b>Genre:</b> {r['genre']}</p>
-                <p><b>Score:</b> {r['score']}</p>
-                <p style="color:lightgray;">💡 {r['why']}</p>
+                <p>🎼 Genre: {r['genre']}</p>
+                <p>⭐ Score: {r['score']}</p>
             </div>
             """, unsafe_allow_html=True)
 
             if deezer:
                 st.image(deezer["image"], use_container_width=True)
-
                 if deezer["preview"]:
                     st.audio(deezer["preview"])
-
-            # -------------------------
-            # USER FEEDBACK LOOP (FINAL BOSS FEATURE)
-            # -------------------------
-            col1, col2 = st.columns(2)
-
-            with col1:
-                if st.button(f"👍 Like {i}", key=f"like_{i}"):
-                    update_user_profile(r["genre"], r["song"])
-                    st.success("Learning your taste...")
-
-            with col2:
-                if st.button(f"👎 Skip {i}", key=f"skip_{i}"):
-                    st.info("Refining recommendations...")
