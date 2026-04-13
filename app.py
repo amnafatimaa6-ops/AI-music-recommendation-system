@@ -28,15 +28,11 @@ def get_deezer(song):
     }
 
 # -------------------------
-# MODE
+# MODE (UPDATED)
 # -------------------------
-mode = st.radio("Choose Mode", ["🎭 Mood", "🎤 Artist", "🎼 Genre"])
+mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
-if mode == "🎭 Mood":
-    query = st.text_input("Enter mood (sad, happy, chill, energetic)")
-    mode_key = "mood"
-
-elif mode == "🎤 Artist":
+if mode == "🎤 Artist":
     query = st.selectbox("Select Artist", sorted(df['track_artist'].unique()))
     mode_key = "artist"
 
