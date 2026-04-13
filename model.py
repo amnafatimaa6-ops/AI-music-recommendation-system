@@ -4,25 +4,42 @@ import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
+# -------------------------
+# LOAD DATA
+# -------------------------
 df = pd.read_csv("music_df.csv")
 text_embeddings = pickle.load(open("text_embeddings.pkl", "rb"))
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
+# -------------------------
+# MOOD MAP
+# -------------------------
 MOOD_MAP = {
     "sad": "melancholy emotional slow acoustic piano soft",
     "happy": "joyful energetic upbeat dance fun bright",
-    "chill": "lo-fi ambient calm peaceful study sleep",
-    "energetic": "high energy fast hype workout bass aggressive"
+    "chill": "lofi ambient calm peaceful study sleep",
+    "energetic": "high energy fast hype workout bass"
 }
 
+# -------------------------
+# GENRE DISTRIBUTION (KEY FIX)
+# -------------------------
+genre_distribution = df['playlist_genre'].value_counts(normalize=True)
+
+# -------------------------
+# QUERY EXPANSION
+# -------------------------
 def expand_query(query, mode):
     if mode == "artist":
         return query + " similar artists songs albums music"
     if mode == "genre":
-        return query + " top songs playlist hits"
+        return query + " playlist top songs artists"
     return MOOD_MAP.get(query.lower(), query)
 
+# -------------------------
+# MAIN RECOMMENDER
+# -------------------------
 def search_music(query, mode="mood", top_n=10):
 
     expanded_query = expand_query(query, mode)
@@ -32,36 +49,45 @@ def search_music(query, mode="mood", top_n=10):
 
     audio = df['mood_score'].values
 
-    # NORMALIZED SCORING (IMPORTANT FIX)
+    # -------------------------
+    # NORMALIZATION (IMPORTANT)
+    # -------------------------
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
     audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
-    final_score = 0.6 * sim + 0.4 * audio
+    base_score = 0.6 * sim + 0.4 * audio
 
-    idxs = np.argsort(final_score)[::-1]
+    idxs = np.argsort(base_score)[::-1]
 
     results = []
-    seen = set()
-
-    anchor_artist = query
+    seen_artists = set()
 
     for i in idxs:
 
         artist = df.iloc[i]['track_artist']
         genre = df.iloc[i]['playlist_genre']
 
-        if artist in seen:
+        if artist in seen_artists:
             continue
 
-        # anchor lock for artist mode
-        if mode == "artist" and artist == anchor_artist:
-            boost = 0.2
-        else:
-            boost = 0
+        # -------------------------
+        # GENRE PENALTY (POP FIX 🔥)
+        # -------------------------
+        penalty = genre_distribution.get(genre, 0)
+        score = base_score[i] * (1 - penalty)
 
-        score = final_score[i] + boost
+        # -------------------------
+        # ARTIST BOOST
+        # -------------------------
+        if mode == "artist" and artist == query:
+            score += 0.2
 
-        seen.add(artist)
+        # -------------------------
+        # RANDOM DISCOVERY (SPOTIFY FEEL)
+        # -------------------------
+        score += np.random.uniform(-0.02, 0.02)
+
+        seen_artists.add(artist)
 
         results.append({
             "song": artist,
