@@ -165,7 +165,9 @@ Out-of-dataset queries ❌
 This can lead to:
 
 Empty recommendations
+
 Poor quality matches
+
 Reduced user experience
 
 
