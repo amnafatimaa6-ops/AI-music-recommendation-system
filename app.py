@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from model import search_music, df
+from model import search_music, get_similar_artists, df
 
 # -------------------------
 # CONFIG
@@ -8,7 +8,7 @@ from model import search_music, df
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Balanced AI + Discovery Engine")
+st.markdown("Transformer NLP + Playlist Intelligence + Discovery Engine")
 
 # -------------------------
 # DEEZER API
@@ -28,7 +28,7 @@ def get_deezer(song):
     }
 
 # -------------------------
-# MODE (UPDATED)
+# MODE
 # -------------------------
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
@@ -41,13 +41,13 @@ elif mode == "🎼 Genre":
     mode_key = "genre"
 
 # -------------------------
-# BUTTON
+# RECOMMEND BUTTON
 # -------------------------
 if st.button("Generate Playlist 🎧"):
 
     results = search_music(query, mode_key)
 
-    st.subheader("🎵 Your AI Playlist")
+    st.subheader("🎵 Recommendations")
 
     cols = st.columns(3)
 
@@ -73,5 +73,36 @@ if st.button("Generate Playlist 🎧"):
 
             if deezer:
                 st.image(deezer["image"], use_container_width=True)
-                if deezer["preview"]:
-                    st.audio(deezer["preview"])
+                st.audio(deezer["preview"])
+
+    # -------------------------
+    # SIMILAR ARTISTS SECTION
+    # -------------------------
+    if mode_key == "artist":
+
+        st.subheader("🎤 Similar Artists You Might Like")
+
+        similar = get_similar_artists(query)
+
+        cols2 = st.columns(len(similar))
+
+        for i, artist in enumerate(similar):
+
+            deezer = get_deezer(artist)
+
+            with cols2[i]:
+
+                st.markdown(f"""
+                <div style="
+                    padding:10px;
+                    border-radius:12px;
+                    background:#1a1a1a;
+                    text-align:center;
+                    color:white;
+                ">
+                    <b>{artist}</b>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if deezer:
+                    st.image(deezer["image"], use_container_width=True)
