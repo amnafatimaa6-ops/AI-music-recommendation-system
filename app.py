@@ -1,19 +1,43 @@
 import streamlit as st
 import requests
-import model  
+import model
 
 search_music = model.search_music
 get_similar_artists = model.get_similar_artists
 df = model.df
 
+# -------------------------
 # PAGE CONFIG
-
+# -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
-st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Balanced Discovery Engine")
+# -------------------------
+# SPOTIFY STYLE UI
+# -------------------------
+st.markdown("""
+<style>
+.main {
+    background-color: #0e1117;
+}
+h1 {
+    color: #1DB954;
+}
+.card {
+    background-color: #181818;
+    padding: 15px;
+    border-radius: 15px;
+    margin-bottom: 10px;
+    border: 1px solid #2a2a2a;
+}
+</style>
+""", unsafe_allow_html=True)
 
-#DEEZER API
+st.title("🎧 AI Music Recommender System")
+st.markdown("Transformer NLP + Playlist Intelligence + Discovery Engine")
+
+# -------------------------
+# DEEZER API
+# -------------------------
 def get_deezer(song):
     url = f"https://api.deezer.com/search?q={song}"
     res = requests.get(url).json()
@@ -28,8 +52,9 @@ def get_deezer(song):
         "preview": t["preview"]
     }
 
-#MODE
-
+# -------------------------
+# MODE
+# -------------------------
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
 if mode == "🎤 Artist":
@@ -40,8 +65,9 @@ elif mode == "🎼 Genre":
     query = st.selectbox("Select Genre", sorted(df['playlist_genre'].unique()))
     mode_key = "genre"
 
-#GENERATE BUTTON
-
+# -------------------------
+# GENERATE
+# -------------------------
 if st.button("Generate Playlist 🎧"):
 
     results = search_music(query, mode_key)
@@ -57,13 +83,7 @@ if st.button("Generate Playlist 🎧"):
         with cols[i % 3]:
 
             st.markdown(f"""
-            <div style="
-                padding:15px;
-                border-radius:15px;
-                background:#111;
-                color:white;
-                margin-bottom:15px;
-            ">
+            <div class="card">
                 <h4>🎵 {r['song']}</h4>
                 <p>🎼 Genre: {r['genre']}</p>
                 <p>⭐ Score: {r['score']}</p>
@@ -74,9 +94,9 @@ if st.button("Generate Playlist 🎧"):
                 st.image(deezer["image"], use_container_width=True)
                 st.audio(deezer["preview"])
 
-
-    #SIMILAR ARTISTS SECTION
-
+    # -------------------------
+    # SIMILAR ARTISTS
+    # -------------------------
     if mode_key == "artist":
 
         st.subheader("🎤 Similar Artists")
@@ -92,16 +112,17 @@ if st.button("Generate Playlist 🎧"):
             with cols2[i]:
 
                 st.markdown(f"""
-                <div style="
-                    padding:10px;
-                    border-radius:12px;
-                    background:#1a1a1a;
-                    text-align:center;
-                    color:white;
-                ">
+                <div class="card" style="text-align:center;">
                     <b>{artist}</b>
                 </div>
                 """, unsafe_allow_html=True)
 
                 if deezer:
                     st.image(deezer["image"], use_container_width=True)
+
+# -------------------------
+# FOOTER
+# -------------------------
+st.markdown("---")
+st.markdown("💡 Built with Transformer NLP + Audio Intelligence + Deezer API")
+st.markdown("🚀 Spotify-style AI Discovery Engine")
