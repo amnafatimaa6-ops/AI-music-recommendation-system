@@ -5,9 +5,8 @@ import streamlit as st
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
-# -------------------------
-# LOAD DATA
-# -------------------------
+#LOAD DATA
+
 df = pd.read_csv("music_df.csv")
 
 @st.cache_data
@@ -16,23 +15,20 @@ def load_embeddings():
 
 text_embeddings = load_embeddings()
 
-# -------------------------
-# LOAD MODEL (CACHE FOR SPEED)
-# -------------------------
+#LOAD MODEL (CACHE FOR SPEED)
+
 @st.cache_resource
 def load_model():
     return SentenceTransformer('all-MiniLM-L6-v2')
 
 model = load_model()
 
-# -------------------------
-# GENRE BIAS CONTROL
-# -------------------------
+#GENRE BIAS CONTROL
+
 genre_distribution = df['playlist_genre'].value_counts(normalize=True)
 
-# -------------------------
-# QUERY EXPANSION
-# -------------------------
+#QUERY EXPANSION
+
 def expand_query(query, mode):
     if mode == "artist":
         return query + " similar artists songs albums music"
@@ -40,9 +36,8 @@ def expand_query(query, mode):
         return query + " playlist top songs artists"
     return query
 
-# -------------------------
-# MAIN RECOMMENDER
-# -------------------------
+#MAIN RECOMMENDER
+
 def search_music(query, mode="artist", top_n=10):
 
     query = expand_query(query, mode)
@@ -52,7 +47,7 @@ def search_music(query, mode="artist", top_n=10):
 
     audio = df['mood_score'].values
 
-    # NORMALIZE
+    #NORMALIZE
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
     audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
@@ -92,9 +87,7 @@ def search_music(query, mode="artist", top_n=10):
 
     return results
 
-# -------------------------
-# SIMILAR ARTISTS
-# -------------------------
+#SIMILAR ARTISTS
 def get_similar_artists(artist_name, top_n=5):
 
     idx_list = df[df['track_artist'] == artist_name].index
