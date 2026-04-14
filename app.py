@@ -6,14 +6,13 @@ search_music = model.search_music
 get_similar_artists = model.get_similar_artists
 df = model.df
 
-# -------------------------
-# PAGE CONFIG
-# -------------------------
+#PAGE CONFIG
+
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
-# -------------------------
-# SPOTIFY STYLE UI
-# -------------------------
+
+#SPOTIFY STYLE UI
+
 st.markdown("""
 <style>
 .main {
@@ -35,9 +34,9 @@ h1 {
 st.title("🎧 AI Music Recommender System")
 st.markdown("Transformer NLP + Playlist Intelligence + Discovery Engine")
 
-# -------------------------
-# DEEZER API
-# -------------------------
+
+#DEEZER API
+
 def get_deezer(song):
     url = f"https://api.deezer.com/search?q={song}"
     res = requests.get(url).json()
@@ -52,9 +51,8 @@ def get_deezer(song):
         "preview": t["preview"]
     }
 
-# -------------------------
-# MODE
-# -------------------------
+#MODE
+
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
 if mode == "🎤 Artist":
@@ -65,9 +63,8 @@ elif mode == "🎼 Genre":
     query = st.selectbox("Select Genre", sorted(df['playlist_genre'].unique()))
     mode_key = "genre"
 
-# -------------------------
-# GENERATE
-# -------------------------
+#GENERATE
+
 if st.button("Generate Playlist 🎧"):
 
     results = search_music(query, mode_key)
@@ -94,9 +91,8 @@ if st.button("Generate Playlist 🎧"):
                 st.image(deezer["image"], use_container_width=True)
                 st.audio(deezer["preview"])
 
-    # -------------------------
-    # SIMILAR ARTISTS
-    # -------------------------
+    #SIMILAR ARTISTS
+
     if mode_key == "artist":
 
         st.subheader("🎤 Similar Artists")
@@ -120,9 +116,9 @@ if st.button("Generate Playlist 🎧"):
                 if deezer:
                     st.image(deezer["image"], use_container_width=True)
 
-# -------------------------
-# FOOTER
-# -------------------------
+
+#FOOTER
+
 st.markdown("---")
 st.markdown("💡 Built with Transformer NLP + Audio Intelligence + Deezer API")
 st.markdown("🚀 Spotify-style AI Discovery Engine")
