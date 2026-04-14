@@ -1,22 +1,38 @@
 import pandas as pd
 import numpy as np
 import pickle
+import streamlit as st
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
-#LOAD DATA
-
+# -------------------------
+# LOAD DATA
+# -------------------------
 df = pd.read_csv("music_df.csv")
-text_embeddings = pickle.load(open("text_embeddings.pkl", "rb"))
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+@st.cache_data
+def load_embeddings():
+    return pickle.load(open("text_embeddings.pkl", "rb"))
 
-#GENRE BIAS FIX
+text_embeddings = load_embeddings()
 
+# -------------------------
+# LOAD MODEL (CACHE FOR SPEED)
+# -------------------------
+@st.cache_resource
+def load_model():
+    return SentenceTransformer('all-MiniLM-L6-v2')
+
+model = load_model()
+
+# -------------------------
+# GENRE BIAS CONTROL
+# -------------------------
 genre_distribution = df['playlist_genre'].value_counts(normalize=True)
 
-#QUERY EXPANSION
-
+# -------------------------
+# QUERY EXPANSION
+# -------------------------
 def expand_query(query, mode):
     if mode == "artist":
         return query + " similar artists songs albums music"
@@ -24,18 +40,19 @@ def expand_query(query, mode):
         return query + " playlist top songs artists"
     return query
 
-#MAIN RECOMMENDER
-
+# -------------------------
+# MAIN RECOMMENDER
+# -------------------------
 def search_music(query, mode="artist", top_n=10):
 
-    expanded_query = expand_query(query, mode)
+    query = expand_query(query, mode)
 
-    query_vec = model.encode([expanded_query])
+    query_vec = model.encode([query])
     sim = cosine_similarity(query_vec, text_embeddings)[0]
 
     audio = df['mood_score'].values
 
-#NORMALIZATION
+    # NORMALIZE
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
     audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
@@ -44,28 +61,25 @@ def search_music(query, mode="artist", top_n=10):
     idxs = np.argsort(base_score)[::-1]
 
     results = []
-    seen_artists = set()
+    seen = set()
 
     for i in idxs:
 
         artist = df.iloc[i]['track_artist']
         genre = df.iloc[i]['playlist_genre']
 
-        if artist in seen_artists:
+        if artist in seen:
             continue
 
-#genre debiasing 
         penalty = genre_distribution.get(genre, 0)
         score = base_score[i] * (1 - penalty)
 
-#artist boost
         if mode == "artist" and artist == query:
             score += 0.2
 
- #light randomness (discovery feel)
         score += np.random.uniform(-0.02, 0.02)
 
-        seen_artists.add(artist)
+        seen.add(artist)
 
         results.append({
             "song": artist,
@@ -78,8 +92,9 @@ def search_music(query, mode="artist", top_n=10):
 
     return results
 
+# -------------------------
 # SIMILAR ARTISTS
-
+# -------------------------
 def get_similar_artists(artist_name, top_n=5):
 
     idx_list = df[df['track_artist'] == artist_name].index
