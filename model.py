@@ -4,22 +4,19 @@ import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
-# -------------------------
-# LOAD DATA
-# -------------------------
+#LOAD DATA
+
 df = pd.read_csv("music_df.csv")
 text_embeddings = pickle.load(open("text_embeddings.pkl", "rb"))
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-# -------------------------
-# GENRE BIAS FIX
-# -------------------------
+#GENRE BIAS FIX
+
 genre_distribution = df['playlist_genre'].value_counts(normalize=True)
 
-# -------------------------
-# QUERY EXPANSION
-# -------------------------
+#QUERY EXPANSION
+
 def expand_query(query, mode):
     if mode == "artist":
         return query + " similar artists songs albums music"
@@ -27,9 +24,8 @@ def expand_query(query, mode):
         return query + " playlist top songs artists"
     return query
 
-# -------------------------
-# MAIN RECOMMENDER
-# -------------------------
+#MAIN RECOMMENDER
+
 def search_music(query, mode="artist", top_n=10):
 
     expanded_query = expand_query(query, mode)
@@ -39,7 +35,7 @@ def search_music(query, mode="artist", top_n=10):
 
     audio = df['mood_score'].values
 
-    # NORMALIZATION
+#NORMALIZATION
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
     audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
@@ -58,15 +54,15 @@ def search_music(query, mode="artist", top_n=10):
         if artist in seen_artists:
             continue
 
-        # genre debiasing (POP FIX)
+#genre debiasing 
         penalty = genre_distribution.get(genre, 0)
         score = base_score[i] * (1 - penalty)
 
-        # artist boost
+#artist boost
         if mode == "artist" and artist == query:
             score += 0.2
 
-        # light randomness (discovery feel)
+ #light randomness (discovery feel)
         score += np.random.uniform(-0.02, 0.02)
 
         seen_artists.add(artist)
@@ -82,10 +78,8 @@ def search_music(query, mode="artist", top_n=10):
 
     return results
 
-
-# -------------------------
 # SIMILAR ARTISTS
-# -------------------------
+
 def get_similar_artists(artist_name, top_n=5):
 
     idx_list = df[df['track_artist'] == artist_name].index
