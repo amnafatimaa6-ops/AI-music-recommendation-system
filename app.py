@@ -1,14 +1,18 @@
 import streamlit as st
 import requests
-from model import search_music, get_similar_artists, df
+import model  # FIXED IMPORT STYLE (prevents Streamlit Cloud crash)
+
+search_music = model.search_music
+get_similar_artists = model.get_similar_artists
+df = model.df
 
 # -------------------------
-# CONFIG
+# PAGE CONFIG
 # -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Playlist Intelligence + Discovery Engine")
+st.markdown("Transformer NLP + Balanced Discovery Engine")
 
 # -------------------------
 # DEEZER API
@@ -41,7 +45,7 @@ elif mode == "🎼 Genre":
     mode_key = "genre"
 
 # -------------------------
-# RECOMMEND BUTTON
+# GENERATE BUTTON
 # -------------------------
 if st.button("Generate Playlist 🎧"):
 
@@ -80,7 +84,7 @@ if st.button("Generate Playlist 🎧"):
     # -------------------------
     if mode_key == "artist":
 
-        st.subheader("🎤 Similar Artists You Might Like")
+        st.subheader("🎤 Similar Artists")
 
         similar = get_similar_artists(query)
 
