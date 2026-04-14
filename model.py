@@ -13,7 +13,7 @@ text_embeddings = pickle.load(open("text_embeddings.pkl", "rb"))
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # -------------------------
-# GENRE DISTRIBUTION (ANTI-BIAS)
+# GENRE BIAS FIX
 # -------------------------
 genre_distribution = df['playlist_genre'].value_counts(normalize=True)
 
@@ -58,7 +58,7 @@ def search_music(query, mode="artist", top_n=10):
         if artist in seen_artists:
             continue
 
-        # genre debiasing
+        # genre debiasing (POP FIX)
         penalty = genre_distribution.get(genre, 0)
         score = base_score[i] * (1 - penalty)
 
@@ -66,7 +66,7 @@ def search_music(query, mode="artist", top_n=10):
         if mode == "artist" and artist == query:
             score += 0.2
 
-        # small randomness (discovery effect)
+        # light randomness (discovery feel)
         score += np.random.uniform(-0.02, 0.02)
 
         seen_artists.add(artist)
@@ -84,7 +84,7 @@ def search_music(query, mode="artist", top_n=10):
 
 
 # -------------------------
-# SIMILAR ARTISTS FEATURE
+# SIMILAR ARTISTS
 # -------------------------
 def get_similar_artists(artist_name, top_n=5):
 
