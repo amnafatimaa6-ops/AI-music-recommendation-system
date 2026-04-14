@@ -88,6 +88,7 @@ Real-time music preview integration
 
 
 AI-Music-Recommender/
+
 │
 ├── app.py              # Streamlit frontend
 
@@ -102,7 +103,79 @@ AI-Music-Recommender/
 ├── requirements.txt    # Dependencies
 
 
+⚙️ How It Works
+
+Step 1: User Input
+
+Artist OR Genre selection
+
+Step 2: AI Processing
+
+Transformer encodes query
+
+Cosine similarity computation
+
+Audio feature blending
+
+Step 3: Ranking Engine
+
+Removes duplicates
+
+Applies genre penalty
+
+Adds exploration factor
+
+Step 4: Output Layer
+
+Ranked songs
+
+Similar artists
+
+Album covers + previews
+
+Step 5: Fallback Layer (if needed)
+
+Ensures minimum results always shown
+
 ├── .streamlit/config.toml  # UI config
+
+🧪 Example Output
+Input: Taylor Swift
+
+Output:
+🎵 Taylor Swift — pop — 0.75  
+🎵 Tate McRae — pop — 0.54  
+🎵 Eminem, Rihanna — blues — 0.70  
+🎵 Madonna — pop — 0.56  
+
+🌐 Deployment
+Streamlit 
+GitHub integration
+
+
+⚠️ Smart Fallback System (Cold Start Handling)
+🧠 Problem
+
+In real-world usage, users may search for:
+
+Rare artists 🎤
+Low-representation genres 🎼
+Out-of-dataset queries ❌
+
+This can lead to:
+
+Empty recommendations
+Poor quality matches
+Reduced user experience
+
+
+
+
+
+
+
+
+
 
 
 
