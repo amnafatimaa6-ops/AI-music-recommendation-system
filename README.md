@@ -89,10 +89,23 @@ Real-time music preview integration
 
 AI-Music-Recommender/
 │
-├── app.py                  # Streamlit frontend
-├── model.py                # AI recommendation engine
-├── music_df.csv            # Spotify dataset
-├── text_embeddings.pkl     # Precomputed embeddings
-├── audio_matrix.npy        # Feature matrix
-├── requirements.txt        # Dependencies
+├── app.py              # Streamlit frontend
+
+├── model.py            # AI recommendation engine
+
+├── music_df.csv        # Spotify dataset
+
+├── text_embeddings.pkl # Precomputed embeddings
+
+├── audio_matrix.npy    # Feature matrix
+
+├── requirements.txt    # Dependencies
+
+
 ├── .streamlit/config.toml  # UI config
+
+
+
+
+
+
