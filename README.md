@@ -1,4 +1,4 @@
-🎧 #AI Music Recommender System
+# 🎧✨ AI MUSIC RECOMMENDER SYSTEM  
 Transformer NLP + Playlist Intelligence + Discovery Engine 🚀
 🌟 Overview
 
