@@ -20,6 +20,7 @@ st.markdown("""
 <style>
 .main {background-color: #0e1117;}
 h1 {color: #1DB954;}
+
 .card {
     background-color: #181818;
     padding: 15px;
@@ -51,7 +52,7 @@ def save_users(data):
 
 users = load_users()
 
-st.sidebar.title("👤 User")
+st.sidebar.title("👤 User Login")
 email = st.sidebar.text_input("Enter Email")
 
 if email:
@@ -61,13 +62,37 @@ if email:
             "playlists": []
         }
         save_users(users)
-        st.sidebar.success("Account created 🎉")
+        st.sidebar.success("New account created 🎉")
 
     st.session_state["user"] = email
     st.sidebar.success(f"Logged in as {email}")
 
 # -------------------------
-# ACTIVITY LOG
+# USER PROFILE PANEL
+# -------------------------
+if "user" in st.session_state:
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("👤 Profile")
+
+    user_data = users.get(st.session_state["user"], {})
+
+    st.sidebar.write("📧", st.session_state["user"])
+    st.sidebar.write("📅 Joined:", user_data.get("created_at", "Unknown"))
+    st.sidebar.write("🎧 Saved Playlists:", len(user_data.get("playlists", [])))
+
+# -------------------------
+# DATASET INFO PANEL (NEW DATA CONFIRMATION)
+# -------------------------
+st.sidebar.markdown("---")
+st.sidebar.subheader("📊 Dataset Info")
+
+st.sidebar.write("Total Songs:", len(df))
+st.sidebar.write("Artists:", df['track_artist'].nunique())
+st.sidebar.write("Genres:", df['playlist_genre'].nunique())
+
+# -------------------------
+# ACTIVITY TRACKING
 # -------------------------
 ACTIVITY_FILE = "activity_log.json"
 
@@ -109,22 +134,27 @@ def get_deezer(song):
 # -------------------------
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
+# CLEAN UNIQUE LISTS (FIX NEW DATASET ISSUE)
+artist_list = sorted(list(set(df['track_artist'].dropna().astype(str))))
+genre_list = sorted(list(set(df['playlist_genre'].dropna().astype(str))))
+
 if mode == "🎤 Artist":
-    query = st.selectbox("Select Artist", sorted(df['track_artist'].unique()))
+    query = st.selectbox("Select Artist", artist_list)
     mode_key = "artist"
+
 else:
-    query = st.selectbox("Select Genre", sorted(df['playlist_genre'].unique()))
+    query = st.selectbox("Select Genre", genre_list)
     mode_key = "genre"
 
 # -------------------------
-# GENERATE
+# GENERATE RECOMMENDATIONS
 # -------------------------
 if st.button("Generate Playlist 🎧"):
 
     results = search_music(query, mode_key)
 
     if "user" in st.session_state:
-        log_activity(st.session_state["user"], f"Searched: {query}")
+        log_activity(st.session_state["user"], f"Searched {query}")
 
     st.subheader("🎵 Recommendations")
 
@@ -148,18 +178,28 @@ if st.button("Generate Playlist 🎧"):
                 st.image(deezer["image"], use_container_width=True)
                 st.audio(deezer["preview"])
 
+    # -------------------------
     # SAVE PLAYLIST
+    # -------------------------
     if st.button("💾 Save Playlist"):
+
         if "user" in st.session_state:
+
             users[st.session_state["user"]]["playlists"].append(results)
             save_users(users)
-            st.success("Playlist saved 🎧")
-        else:
-            st.warning("Login first")
 
+            st.success("Playlist saved 🎧")
+
+        else:
+            st.warning("Please login first")
+
+    # -------------------------
     # SIMILAR ARTISTS
+    # -------------------------
     if mode_key == "artist":
+
         st.subheader("🎤 Similar Artists")
+
         similar = get_similar_artists(query)
 
         cols2 = st.columns(len(similar))
@@ -170,11 +210,12 @@ if st.button("Generate Playlist 🎧"):
 
             with cols2[i]:
                 st.markdown(f"<div class='card'><b>{artist}</b></div>", unsafe_allow_html=True)
+
                 if deezer:
                     st.image(deezer["image"], use_container_width=True)
 
 # -------------------------
-# ADMIN PANEL
+# ACTIVITY PANEL (ADMIN VIEW)
 # -------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("📡 Activity Monitor")
@@ -183,7 +224,9 @@ if st.sidebar.button("Show Activity"):
     try:
         with open("activity_log.json", "r") as f:
             logs = json.load(f)
+
         st.sidebar.write(logs[-10:])
+
     except:
         st.sidebar.write("No activity yet")
 
