@@ -7,44 +7,52 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# LOAD DATA
+# LOAD DATA SAFELY
 # -------------------------
 df = pd.read_csv("music_df.csv")
 
+# -------------------------
+# LOAD EMBEDDINGS SAFELY
+# -------------------------
 with open("text_embeddings.pkl", "rb") as f:
     text_embeddings = pickle.load(f)
 
+# -------------------------
+# TRANSFORMER MODEL
+# -------------------------
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------
-# RECOMMENDER
+# SEARCH MUSIC ENGINE
 # -------------------------
 def search_music(query, mode="artist", top_n=10):
 
     query_vec = model.encode([query])
+
     sim = cosine_similarity(query_vec, text_embeddings)[0]
 
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
 
     audio = df["mood_score"].values
 
-    base = 0.6 * sim + 0.4 * audio
+    base_score = 0.6 * sim + 0.4 * audio
 
-    idxs = np.argsort(base)[::-1]
+    idxs = np.argsort(base_score)[::-1]
 
     results = []
 
     for i in idxs[:top_n]:
+
         results.append({
             "song": df.iloc[i]["track_artist"],
             "genre": df.iloc[i]["playlist_genre"],
-            "score": round(float(base[i]), 3)
+            "score": round(float(base_score[i]), 3)
         })
 
     return results
 
 # -------------------------
-# SIMILAR ARTISTS
+# SIMILAR ARTISTS ENGINE
 # -------------------------
 def get_similar_artists(artist_name, top_n=5):
 
@@ -80,7 +88,7 @@ def get_similar_artists(artist_name, top_n=5):
     return out
 
 # -------------------------
-# DEEZER (ALBUM + PREVIEW)
+# DEEZER API (ALBUM + PREVIEW)
 # -------------------------
 def get_deezer(song):
     try:
@@ -101,11 +109,11 @@ def get_deezer(song):
         return None
 
 # -------------------------
-# ITUNES (FULL TRACK + SAFE)
+# ITUNES API (FULL TRACK SAFE)
 # -------------------------
 def get_itunes(song, artist):
     try:
-        query = f"{song} {artist}"
+        query = urllib.parse.quote(f"{song} {artist}")
         url = f"https://itunes.apple.com/search?term={query}&limit=1"
 
         res = requests.get(url).json()
@@ -127,9 +135,9 @@ def get_itunes(song, artist):
         return None
 
 # -------------------------
-# YOUTUBE (SAFE LINK GENERATOR - NO SCRAPING)
+# YOUTUBE SAFE LINK (NO SCRAPING)
 # -------------------------
-def get_youtube_fallback(song, artist):
+def get_youtube(song, artist):
     try:
         query = f"{artist} {song} official audio"
         url = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(query)
