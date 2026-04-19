@@ -1,13 +1,13 @@
 import streamlit as st
 import model
-from youtubesearchpython import VideosSearch
 
 # -------------------------
-# LOAD MODEL FUNCTIONS
+# LOAD FUNCTIONS
 # -------------------------
 search_music = model.search_music
 get_similar_artists = model.get_similar_artists
 get_deezer = model.get_deezer
+get_itunes = model.get_itunes
 df = model.df
 
 # -------------------------
@@ -16,53 +16,7 @@ df = model.df
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Deezer + YouTube Hybrid Engine")
-
-# -------------------------
-# CLEAN YOUTUBE QUERY
-# -------------------------
-def build_youtube_query(song, artist):
-    song = str(song).split(",")[0]
-    artist = str(artist).split(",")[0]
-    return f"{artist} {song} official audio"
-
-# -------------------------
-# YOUTUBE ENGINE (ROBUST)
-# -------------------------
-def get_youtube_video(song, artist):
-    try:
-        query = build_youtube_query(song, artist)
-
-        search = VideosSearch(query, limit=10)
-        results = search.result().get("result", [])
-
-        for v in results:
-            link = v.get("link", "")
-
-            if link:
-                return {
-                    "title": v.get("title", "Unknown"),
-                    "url": link,
-                    "thumbnail": v["thumbnails"][0]["url"]
-                }
-
-        # fallback search
-        fallback = VideosSearch(song + " audio", limit=5)
-        results2 = fallback.result().get("result", [])
-
-        for v in results2:
-            link = v.get("link", "")
-            if link:
-                return {
-                    "title": v.get("title", "Unknown"),
-                    "url": link,
-                    "thumbnail": v["thumbnails"][0]["url"]
-                }
-
-        return None
-
-    except:
-        return None
+st.markdown("Transformer NLP + Deezer + iTunes Stable Engine")
 
 # -------------------------
 # MODE
@@ -101,25 +55,29 @@ if st.button("Generate 🎧"):
         deezer = get_deezer(r["song"])
 
         if deezer:
-            st.image(deezer["image"], width=300)
+            st.image(deezer["image"], width=250)
             st.audio(deezer["preview"])
 
         # -------------------------
-        # YOUTUBE (FIXED)
+        # ITUNES (MAIN FIX)
         # -------------------------
-        yt = get_youtube_video(r["song"], r["song"])
+        itunes = get_itunes(r["song"], r["song"])
 
-        if yt:
-            st.markdown("### ▶️ Full Song (YouTube)")
-            st.image(yt["thumbnail"])
+        if itunes:
+            st.markdown("### 🎧 Full Track (iTunes)")
+
+            st.image(itunes["image"])
+
+            if itunes["preview"]:
+                st.audio(itunes["preview"])
 
             st.markdown(
-                f"[▶ Watch on YouTube]({yt['url']})",
+                f"[🎵 Open Song]({itunes['url']})",
                 unsafe_allow_html=True
             )
 
         else:
-            st.markdown("🎧 YouTube not found — Deezer preview only")
+            st.markdown("🎧 No full preview available")
 
 # -------------------------
 # SIMILAR ARTISTS
@@ -137,4 +95,4 @@ if mode_key == "artist":
 # FOOTER
 # -------------------------
 st.markdown("---")
-st.markdown("💡 Deezer + YouTube Hybrid AI Music Engine")
+st.markdown("💡 Deezer + iTunes Stable AI Music Engine")
