@@ -2,41 +2,26 @@ import pandas as pd
 import numpy as np
 import pickle
 import requests
+import urllib.parse
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# SAFE LOAD DATA
+# LOAD DATA
 # -------------------------
-try:
-    df = pd.read_csv("music_df.csv")
-except:
-    df = pd.DataFrame(columns=["track_artist", "playlist_genre", "mood_score"])
+df = pd.read_csv("music_df.csv")
 
-# -------------------------
-# SAFE LOAD EMBEDDINGS
-# -------------------------
-try:
-    with open("text_embeddings.pkl", "rb") as f:
-        text_embeddings = pickle.load(f)
-except:
-    text_embeddings = None
+with open("text_embeddings.pkl", "rb") as f:
+    text_embeddings = pickle.load(f)
 
-# -------------------------
-# LOAD MODEL
-# -------------------------
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------
-# SEARCH FUNCTION (SAFE)
+# RECOMMENDER
 # -------------------------
 def search_music(query, mode="artist", top_n=10):
 
-    if text_embeddings is None or df.empty:
-        return []
-
     query_vec = model.encode([query])
-
     sim = cosine_similarity(query_vec, text_embeddings)[0]
 
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
@@ -50,10 +35,9 @@ def search_music(query, mode="artist", top_n=10):
     results = []
 
     for i in idxs[:top_n]:
-
         results.append({
-            "song": str(df.iloc[i]["track_artist"]),
-            "genre": str(df.iloc[i]["playlist_genre"]),
+            "song": df.iloc[i]["track_artist"],
+            "genre": df.iloc[i]["playlist_genre"],
             "score": round(float(base[i]), 3)
         })
 
@@ -63,9 +47,6 @@ def search_music(query, mode="artist", top_n=10):
 # SIMILAR ARTISTS
 # -------------------------
 def get_similar_artists(artist_name, top_n=5):
-
-    if text_embeddings is None or df.empty:
-        return []
 
     idxs = df[df["track_artist"] == artist_name].index
 
@@ -99,7 +80,7 @@ def get_similar_artists(artist_name, top_n=5):
     return out
 
 # -------------------------
-# DEEZER API (SAFE)
+# DEEZER (ALBUM + PREVIEW)
 # -------------------------
 def get_deezer(song):
     try:
@@ -114,6 +95,48 @@ def get_deezer(song):
         return {
             "image": t["album"]["cover_big"],
             "preview": t["preview"]
+        }
+
+    except:
+        return None
+
+# -------------------------
+# ITUNES (FULL TRACK + SAFE)
+# -------------------------
+def get_itunes(song, artist):
+    try:
+        query = f"{song} {artist}"
+        url = f"https://itunes.apple.com/search?term={query}&limit=1"
+
+        res = requests.get(url).json()
+
+        if res["resultCount"] > 0:
+            item = res["results"][0]
+
+            return {
+                "track": item.get("trackName"),
+                "artist": item.get("artistName"),
+                "preview": item.get("previewUrl"),
+                "image": item.get("artworkUrl100"),
+                "url": item.get("trackViewUrl")
+            }
+
+        return None
+
+    except:
+        return None
+
+# -------------------------
+# YOUTUBE (SAFE LINK GENERATOR - NO SCRAPING)
+# -------------------------
+def get_youtube_fallback(song, artist):
+    try:
+        query = f"{artist} {song} official audio"
+        url = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(query)
+
+        return {
+            "query": query,
+            "url": url
         }
 
     except:
