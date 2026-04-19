@@ -8,19 +8,19 @@ search_music = model.search_music
 get_similar_artists = model.get_similar_artists
 get_deezer = model.get_deezer
 get_itunes = model.get_itunes
-get_youtube = model.get_youtube_fallback
+get_youtube = model.get_youtube
 df = model.df
 
 # -------------------------
-# UI
+# PAGE CONFIG
 # -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Deezer + iTunes + YouTube Search Engine")
+st.markdown("Transformer NLP + Deezer + iTunes + YouTube Engine (Stable)")
 
 # -------------------------
-# MODE
+# MODE SELECT
 # -------------------------
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
@@ -65,7 +65,7 @@ if st.button("Generate 🎧"):
         itunes = get_itunes(r["song"], r["song"])
 
         if itunes:
-            st.markdown("### 🎧 Full Track (iTunes)")
+            st.markdown("### 🎧 iTunes Full Preview")
             st.image(itunes["image"])
 
             if itunes["preview"]:
@@ -74,12 +74,12 @@ if st.button("Generate 🎧"):
             st.markdown(f"[🎵 Open Song]({itunes['url']})")
 
         # -------------------------
-        # YOUTUBE (FIXED LINK - ALWAYS WORKS)
+        # YOUTUBE (SAFE LINK)
         # -------------------------
         yt = get_youtube(r["song"], r["song"])
 
         if yt:
-            st.markdown("### ▶️ YouTube (Search)")
+            st.markdown("### ▶️ YouTube")
             st.markdown(f"🔎 `{yt['query']}`")
             st.markdown(f"[▶ Open on YouTube]({yt['url']})")
 
@@ -99,4 +99,4 @@ if mode_key == "artist":
 # FOOTER
 # -------------------------
 st.markdown("---")
-st.markdown("💡 Stable AI Music Engine vFinal (Deezer + iTunes + YouTube Search)")
+st.markdown("💡 Stable Spotify-Style AI Music Engine (No Crashes Version)")
