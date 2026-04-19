@@ -2,6 +2,9 @@ import streamlit as st
 import model
 from youtubesearchpython import VideosSearch
 
+# -------------------------
+# LOAD MODEL FUNCTIONS
+# -------------------------
 search_music = model.search_music
 get_similar_artists = model.get_similar_artists
 get_deezer = model.get_deezer
@@ -13,33 +16,33 @@ df = model.df
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Deezer + YouTube Music Engine")
+st.markdown("Transformer NLP + Deezer + YouTube Hybrid Engine")
 
 # -------------------------
-# YOUTUBE ENGINE
+# YOUTUBE FUNCTION (FIXED)
 # -------------------------
-def get_youtube_song(query):
+def get_youtube_video(song, artist):
     try:
-        search = VideosSearch(query + " official audio", limit=1)
-        r = search.result()["result"][0]
+        query = f"{song} {artist} official audio"
+        search = VideosSearch(query, limit=1)
+        result = search.result()
 
-        return {
-            "title": r["title"],
-            "url": r["link"],
-            "thumb": r["thumbnails"][0]["url"]
-        }
+        if result and result["result"]:
+            v = result["result"][0]
+
+            return {
+                "title": v["title"],
+                "url": v["link"],
+                "thumbnail": v["thumbnails"][0]["url"]
+            }
+
+        return None
+
     except:
         return None
 
-def get_artist_songs(artist):
-    try:
-        search = VideosSearch(artist + " top songs", limit=5)
-        return search.result()["result"]
-    except:
-        return []
-
 # -------------------------
-# MODE
+# MODE SELECTION
 # -------------------------
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
@@ -51,7 +54,7 @@ else:
     mode_key = "genre"
 
 # -------------------------
-# GENERATE
+# GENERATE BUTTON
 # -------------------------
 if st.button("Generate 🎧"):
 
@@ -59,23 +62,36 @@ if st.button("Generate 🎧"):
 
     st.subheader("🎵 Recommendations")
 
+    # -------------------------
+    # SONG LOOP
+    # -------------------------
     for r in results:
 
+        st.markdown("---")
+
         st.markdown(f"""
-        ### 🎵 {r['song']}
-        🎼 {r['genre']}  
-        ⭐ {r['score']}
+        ## 🎵 {r['song']}
+        🎼 Genre: {r['genre']}  
+        ⭐ Score: {r['score']}
         """)
 
-        # Deezer preview
+        # -------------------------
+        # DEEZER (COVER + PREVIEW)
+        # -------------------------
         deezer = get_deezer(r["song"])
+
         if deezer:
-            st.image(deezer["image"])
+            st.image(deezer["image"], width=300)
             st.audio(deezer["preview"])
 
-        # YouTube full song
-        yt = get_youtube_song(r["song"])
+        # -------------------------
+        # YOUTUBE (FULL SONG FIXED)
+        # -------------------------
+        yt = get_youtube_video(r["song"], r["song"])
+
         if yt:
+            st.markdown("### ▶️ Full Song (YouTube)")
+            st.image(yt["thumbnail"])
             st.video(yt["url"])
 
 # -------------------------
@@ -87,19 +103,21 @@ if mode_key == "artist":
 
     similar = get_similar_artists(query)
 
-    for a in similar:
-        st.write("🎤", a)
+    for artist in similar:
+        st.write("🎤", artist)
 
     st.subheader("🎶 Artist Full Songs (YouTube)")
 
-    songs = get_artist_songs(query)
+    for artist in similar:
 
-    for s in songs:
-        st.markdown(f"**{s['title']}**")
-        st.video(s["link"])
+        yt = get_youtube_video(artist, artist)
+
+        if yt:
+            st.markdown(f"**{yt['title']}**")
+            st.video(yt["url"])
 
 # -------------------------
 # FOOTER
 # -------------------------
 st.markdown("---")
-st.markdown("💡 AI + Deezer + YouTube Hybrid Music Engine")
+st.markdown("💡 Deezer + YouTube Hybrid AI Music Engine")
