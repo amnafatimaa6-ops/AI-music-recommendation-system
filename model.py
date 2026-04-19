@@ -1,123 +1,135 @@
-import streamlit as st
-import model
-from youtubesearchpython import VideosSearch
+import pandas as pd
+import numpy as np
+import pickle
+import requests
+from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# LOAD MODEL FUNCTIONS
+# LOAD DATA
 # -------------------------
-search_music = model.search_music
-get_similar_artists = model.get_similar_artists
-get_deezer = model.get_deezer
-df = model.df
+df = pd.read_csv("music_df.csv")
 
-# -------------------------
-# PAGE CONFIG
-# -------------------------
-st.set_page_config(page_title="AI Music Recommender", layout="wide")
+with open("text_embeddings.pkl", "rb") as f:
+    text_embeddings = pickle.load(f)
 
-st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Deezer + YouTube Hybrid Engine")
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------
-# YOUTUBE FUNCTION (FIXED)
+# GENRE DISTRIBUTION
 # -------------------------
-def get_youtube_video(song, artist):
-    try:
-        query = f"{song} {artist} official audio"
-        search = VideosSearch(query, limit=1)
-        result = search.result()
-
-        if result and result["result"]:
-            v = result["result"][0]
-
-            return {
-                "title": v["title"],
-                "url": v["link"],
-                "thumbnail": v["thumbnails"][0]["url"]
-            }
-
-        return None
-
-    except:
-        return None
+genre_distribution = df["playlist_genre"].value_counts(normalize=True)
 
 # -------------------------
-# MODE SELECTION
+# QUERY EXPANSION
 # -------------------------
-mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
-
-if mode == "🎤 Artist":
-    query = st.selectbox("Select Artist", sorted(df["track_artist"].unique()))
-    mode_key = "artist"
-else:
-    query = st.selectbox("Select Genre", sorted(df["playlist_genre"].unique()))
-    mode_key = "genre"
+def expand_query(query, mode):
+    if mode == "artist":
+        return query + " songs albums music artist"
+    if mode == "genre":
+        return query + " top playlist songs"
+    return query
 
 # -------------------------
-# GENERATE BUTTON
+# MAIN RECOMMENDER
 # -------------------------
-if st.button("Generate 🎧"):
+def search_music(query, mode="artist", top_n=10):
 
-    results = search_music(query, mode_key)
+    query = expand_query(query, mode)
 
-    st.subheader("🎵 Recommendations")
+    query_vec = model.encode([query])
+    sim = cosine_similarity(query_vec, text_embeddings)[0]
 
-    # -------------------------
-    # SONG LOOP
-    # -------------------------
-    for r in results:
+    sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
 
-        st.markdown("---")
+    audio_score = df["mood_score"].values
 
-        st.markdown(f"""
-        ## 🎵 {r['song']}
-        🎼 Genre: {r['genre']}  
-        ⭐ Score: {r['score']}
-        """)
+    base_score = 0.6 * sim + 0.4 * audio_score
 
-        # -------------------------
-        # DEEZER (COVER + PREVIEW)
-        # -------------------------
-        deezer = get_deezer(r["song"])
+    idxs = np.argsort(base_score)[::-1]
 
-        if deezer:
-            st.image(deezer["image"], width=300)
-            st.audio(deezer["preview"])
+    results = []
+    seen = set()
 
-        # -------------------------
-        # YOUTUBE (FULL SONG FIXED)
-        # -------------------------
-        yt = get_youtube_video(r["song"], r["song"])
+    genre_count = {}
 
-        if yt:
-            st.markdown("### ▶️ Full Song (YouTube)")
-            st.image(yt["thumbnail"])
-            st.video(yt["url"])
+    for i in idxs:
+
+        artist = df.iloc[i]["track_artist"]
+        genre = df.iloc[i]["playlist_genre"]
+
+        if artist in seen:
+            continue
+
+        if genre_count.get(genre, 0) >= 2:
+            continue
+
+        genre_count[genre] = genre_count.get(genre, 0) + 1
+        seen.add(artist)
+
+        penalty = genre_distribution.get(genre, 0)
+        score = base_score[i] * (1 - penalty)
+
+        results.append({
+            "song": artist,
+            "genre": genre,
+            "score": round(float(score), 3)
+        })
+
+        if len(results) == top_n:
+            break
+
+    return results
 
 # -------------------------
 # SIMILAR ARTISTS
 # -------------------------
-if mode_key == "artist":
+def get_similar_artists(artist_name, top_n=5):
 
-    st.subheader("🎤 Similar Artists")
+    idxs = df[df["track_artist"] == artist_name].index
 
-    similar = get_similar_artists(query)
+    if len(idxs) == 0:
+        return []
 
-    for artist in similar:
-        st.write("🎤", artist)
+    idx = idxs[0]
 
-    st.subheader("🎶 Artist Full Songs (YouTube)")
+    sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
+    sorted_idx = np.argsort(sim_scores)[::-1]
 
-    for artist in similar:
+    seen = set()
+    results = []
 
-        yt = get_youtube_video(artist, artist)
+    for i in sorted_idx:
 
-        if yt:
-            st.markdown(f"**{yt['title']}**")
-            st.video(yt["url"])
+        artist = df.iloc[i]["track_artist"]
+
+        if artist == artist_name:
+            continue
+
+        if artist in seen:
+            continue
+
+        seen.add(artist)
+        results.append(artist)
+
+        if len(results) == top_n:
+            break
+
+    return results
 
 # -------------------------
-# FOOTER
+# DEEZER API
 # -------------------------
-st.markdown("---")
-st.markdown("💡 Deezer + YouTube Hybrid AI Music Engine")
+def get_deezer(song):
+    url = f"https://api.deezer.com/search?q={song}"
+    res = requests.get(url).json()
+
+    if "data" not in res or len(res["data"]) == 0:
+        return None
+
+    t = res["data"][0]
+
+    return {
+        "image": t["album"]["cover_big"],
+        "preview": t["preview"]
+    }
