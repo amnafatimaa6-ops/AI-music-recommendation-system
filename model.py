@@ -1,99 +1,120 @@
-import re
+import pandas as pd
+import numpy as np
+import pickle
 import requests
+from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
 
-CURRENCY_INFO = {
-    "PKR": {"name":"Pakistani Rupee","country":"Pakistan","strength":2},
-    "INR": {"name":"Indian Rupee","country":"India","strength":3},
-    "USD": {"name":"US Dollar","country":"United States","strength":9},
-    "EUR": {"name":"Euro","country":"Eurozone","strength":8},
-    "GBP": {"name":"British Pound","country":"United Kingdom","strength":9},
-    "JPY": {"name":"Japanese Yen","country":"Japan","strength":7},
-    "AUD": {"name":"Australian Dollar","country":"Australia","strength":8},
-    "CAD": {"name":"Canadian Dollar","country":"Canada","strength":8},
-    "CNY": {"name":"Chinese Yuan","country":"China","strength":6},
-    "CHF": {"name":"Swiss Franc","country":"Switzerland","strength":10},
-    "RON": {"name":"Romanian Leu","country":"Romania","strength":4}
-}
+# -------------------------
+# SAFE LOAD DATA
+# -------------------------
+try:
+    df = pd.read_csv("music_df.csv")
+except:
+    df = pd.DataFrame(columns=["track_artist", "playlist_genre", "mood_score"])
 
-# 🌐 API
-def get_rate(from_c, to_c):
-    url = f"https://open.er-api.com/v6/latest/{from_c}"
-    data = requests.get(url).json()
-    return data["rates"][to_c]
+# -------------------------
+# SAFE LOAD EMBEDDINGS
+# -------------------------
+try:
+    with open("text_embeddings.pkl", "rb") as f:
+        text_embeddings = pickle.load(f)
+except:
+    text_embeddings = None
 
-# 🧠 PARSER (flexible)
-def parse_query(text):
-    text = text.lower()
+# -------------------------
+# LOAD MODEL
+# -------------------------
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    amount = re.search(r"\d+(\.\d+)?", text)
-    if not amount:
-        return None
+# -------------------------
+# SEARCH FUNCTION (SAFE)
+# -------------------------
+def search_music(query, mode="artist", top_n=10):
 
-    amount = float(amount.group())
+    if text_embeddings is None or df.empty:
+        return []
 
-    text = text.replace("convert", "").replace("to", " ")
-    words = re.findall(r"[a-zA-Z]+", text)
+    query_vec = model.encode([query])
 
-    found = []
-    for w in words:
-        w = w.upper()
-        if w in CURRENCY_INFO:
-            found.append(w)
+    sim = cosine_similarity(query_vec, text_embeddings)[0]
 
-    found = list(dict.fromkeys(found))
+    sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
 
-    if len(found) < 2:
-        return None
+    audio = df["mood_score"].values
 
-    return amount, found[0], found[1]
+    base = 0.6 * sim + 0.4 * audio
 
-# 💰 BUYING POWER (safe default always exists)
-def buying_power(amount, from_c):
-    data = CURRENCY_INFO[from_c]
+    idxs = np.argsort(base)[::-1]
 
-    return [
-        f"☕ Coffee: {round(amount * 0.3, 2)} units",
-        f"🍔 Burgers: {round(amount * 0.2, 2)} units",
-        f"🏠 Rent: {round(amount * 0.01, 4)} days"
-    ]
+    results = []
 
-# 💱 MAIN FUNCTION (NEVER FAILS STRUCTURE)
-def convert(query):
-    parsed = parse_query(query)
+    for i in idxs[:top_n]:
 
-    if not parsed:
+        results.append({
+            "song": str(df.iloc[i]["track_artist"]),
+            "genre": str(df.iloc[i]["playlist_genre"]),
+            "score": round(float(base[i]), 3)
+        })
+
+    return results
+
+# -------------------------
+# SIMILAR ARTISTS
+# -------------------------
+def get_similar_artists(artist_name, top_n=5):
+
+    if text_embeddings is None or df.empty:
+        return []
+
+    idxs = df[df["track_artist"] == artist_name].index
+
+    if len(idxs) == 0:
+        return []
+
+    idx = idxs[0]
+
+    sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
+    sorted_idx = np.argsort(sim_scores)[::-1]
+
+    seen = set()
+    out = []
+
+    for i in sorted_idx:
+
+        artist = df.iloc[i]["track_artist"]
+
+        if artist == artist_name:
+            continue
+
+        if artist in seen:
+            continue
+
+        seen.add(artist)
+        out.append(artist)
+
+        if len(out) == top_n:
+            break
+
+    return out
+
+# -------------------------
+# DEEZER API (SAFE)
+# -------------------------
+def get_deezer(song):
+    try:
+        url = f"https://api.deezer.com/search?q={song}"
+        res = requests.get(url).json()
+
+        if "data" not in res or len(res["data"]) == 0:
+            return None
+
+        t = res["data"][0]
+
         return {
-            "error": "❌ Invalid input. Try: 100 PKR to USD"
+            "image": t["album"]["cover_big"],
+            "preview": t["preview"]
         }
 
-    amount, from_c, to_c = parsed
-
-    try:
-        rate = get_rate(from_c, to_c)
     except:
-        rate = 0
-
-    result = round(amount * rate, 2)
-
-    f = CURRENCY_INFO[from_c]
-    t = CURRENCY_INFO[to_c]
-
-    return {
-        "from": from_c,
-        "to": to_c,
-        "amount": amount,
-        "rate": rate,
-        "result": result,
-
-        "insight": [
-            f"1 {from_c} = {rate:.6f} {to_c}",
-            f"{f['name']} ({f['country']}) → {t['name']} ({t['country']})"
-        ],
-
-        # 🔥 ALWAYS PRESENT (fixes KeyError)
-        "buying_power": buying_power(amount, from_c)
-    }
-
-# 🌍 MAP
-def get_country_strength_map():
-    return {v["country"]: v["strength"] for v in CURRENCY_INFO.values()}
+        return None
