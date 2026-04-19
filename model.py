@@ -1,11 +1,12 @@
 import pandas as pd
 import numpy as np
 import pickle
+import requests
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# DATA
+# LOAD DATA
 # -------------------------
 df = pd.read_csv("music_df.csv")
 
@@ -15,100 +16,59 @@ with open("text_embeddings.pkl", "rb") as f:
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------
-# GLOBAL GENRE STATS
+# GENRE DISTRIBUTION
 # -------------------------
 genre_distribution = df["playlist_genre"].value_counts(normalize=True)
 
 # -------------------------
-# 🧠 LAYER 1: EMOTION BRAIN
-# -------------------------
-MOOD_MAP = {
-    "energetic": {"energy": 0.7, "valence": 0.3},
-    "sad": {"energy": -0.5, "valence": -0.6},
-    "happy": {"energy": 0.4, "valence": 0.7},
-    "chill": {"energy": -0.5},
-    "romantic": {"valence": 0.5},
-    "party": {"energy": 0.8},
-    "focus": {"energy": -0.2}
-}
-
-def get_mood_vector(query):
-    q = query.lower()
-    for mood in MOOD_MAP:
-        if mood in q:
-            return MOOD_MAP[mood]
-    return {}
-
-# -------------------------
-# 🧠 LAYER 2: QUERY EXPANSION
+# QUERY EXPANSION
 # -------------------------
 def expand_query(query, mode):
     if mode == "artist":
-        return query + " similar artists songs albums music"
+        return query + " songs albums artist music"
     if mode == "genre":
-        return query + " top playlist songs trending"
+        return query + " top songs playlist"
     return query
 
 # -------------------------
-# 🚀 MAIN BRAIN ENGINE
+# MAIN RECOMMENDER
 # -------------------------
 def search_music(query, mode="artist", top_n=10):
 
-    query_expanded = expand_query(query, mode)
+    query = expand_query(query, mode)
 
-    query_vec = model.encode([query_expanded])
+    query_vec = model.encode([query])
     sim = cosine_similarity(query_vec, text_embeddings)[0]
 
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
 
-    audio_energy = df["energy"].values
-    audio_valence = df["valence"].values
+    audio_score = df["mood_score"].values
 
-    base_score = 0.65 * sim + 0.35 * df["mood_score"].values
+    base_score = 0.6 * sim + 0.4 * audio_score
 
-    # -------------------------
-    # 🧠 APPLY MOOD BRAIN
-    # -------------------------
-    mood = get_mood_vector(query)
-
-    if "energy" in mood:
-        base_score += mood["energy"] * audio_energy
-
-    if "valence" in mood:
-        base_score += mood["valence"] * audio_valence
-
-    # -------------------------
-    # SORTING
-    # -------------------------
     idxs = np.argsort(base_score)[::-1]
 
     results = []
+    seen = set()
 
-    # 🧠 LAYER 3: DIVERSITY BRAIN
     genre_count = {}
-    seen_artists = set()
 
     for i in idxs:
 
         artist = df.iloc[i]["track_artist"]
         genre = df.iloc[i]["playlist_genre"]
 
-        # avoid duplicates
-        if artist in seen_artists:
+        if artist in seen:
             continue
 
-        # HARD genre limit (Spotify style)
         if genre_count.get(genre, 0) >= 2:
             continue
 
         genre_count[genre] = genre_count.get(genre, 0) + 1
-        seen_artists.add(artist)
+        seen.add(artist)
 
-        # rarity boost (underground discovery)
-        rarity_boost = np.log1p(1 / (genre_distribution.get(genre, 0) + 1e-6))
-
-        score = base_score[i] + 0.1 * rarity_boost
-        score += np.random.uniform(-0.015, 0.015)
+        penalty = genre_distribution.get(genre, 0)
+        score = base_score[i] * (1 - penalty)
 
         results.append({
             "song": artist,
@@ -122,7 +82,7 @@ def search_music(query, mode="artist", top_n=10):
     return results
 
 # -------------------------
-# 🎤 SIMILAR ARTISTS ENGINE (IMPROVED)
+# SIMILAR ARTISTS
 # -------------------------
 def get_similar_artists(artist_name, top_n=5):
 
@@ -137,7 +97,7 @@ def get_similar_artists(artist_name, top_n=5):
     sorted_idx = np.argsort(sim_scores)[::-1]
 
     seen = set()
-    results = []
+    out = []
 
     for i in sorted_idx:
 
@@ -150,9 +110,26 @@ def get_similar_artists(artist_name, top_n=5):
             continue
 
         seen.add(artist)
-        results.append(artist)
+        out.append(artist)
 
-        if len(results) == top_n:
+        if len(out) == top_n:
             break
 
-    return results
+    return out
+
+# -------------------------
+# DEEZER (COVERS + PREVIEW)
+# -------------------------
+def get_deezer(song):
+    url = f"https://api.deezer.com/search?q={song}"
+    res = requests.get(url).json()
+
+    if "data" not in res or len(res["data"]) == 0:
+        return None
+
+    t = res["data"][0]
+
+    return {
+        "image": t["album"]["cover_big"],
+        "preview": t["preview"]
+    }
