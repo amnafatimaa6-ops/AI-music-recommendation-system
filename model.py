@@ -6,36 +6,27 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# LOAD DATASETS (MERGED)
+# LOAD + MERGE DATASETS
 # -------------------------
 df1 = pd.read_csv("music_df.csv")
 df2 = pd.read_csv("spotify_songs.csv")
 
 df = pd.concat([df1, df2], ignore_index=True)
 
-# -------------------------
-# FIX DUPLICATES
-# -------------------------
+# RESET INDEX (VERY IMPORTANT FIX)
+df = df.reset_index(drop=True)
+
+# REMOVE DUPLICATES
 df.drop_duplicates(subset=["track_artist", "playlist_genre"], inplace=True)
 
 # -------------------------
-# SAFE FILLNA (FIX FOR YOUR ERROR)
+# SAFE MISSING VALUES HANDLING
 # -------------------------
-
 num_cols = df.select_dtypes(include=["number"]).columns
 str_cols = df.select_dtypes(include=["object", "string"]).columns
 
 df[num_cols] = df[num_cols].fillna(0)
 df[str_cols] = df[str_cols].fillna("Unknown")
-
-# -------------------------
-# OPTIONAL TYPE SAFETY (IMPORTANT FOR STREAMLIT CLOUD)
-# -------------------------
-if "track_artist" in df.columns:
-    df["track_artist"] = df["track_artist"].astype("string")
-
-if "playlist_genre" in df.columns:
-    df["playlist_genre"] = df["playlist_genre"].astype("string")
 
 # -------------------------
 # LOAD EMBEDDINGS
@@ -45,6 +36,12 @@ def load_embeddings():
     return pickle.load(open("text_embeddings.pkl", "rb"))
 
 text_embeddings = load_embeddings()
+
+# -------------------------
+# SAFETY CHECK (CRITICAL)
+# -------------------------
+if len(df) > len(text_embeddings):
+    print("⚠️ WARNING: DF and embeddings mismatch!")
 
 # -------------------------
 # LOAD MODEL
@@ -71,7 +68,7 @@ def expand_query(query, mode):
     return query
 
 # -------------------------
-# MAIN RECOMMENDER (UNCHANGED LOGIC)
+# MAIN RECOMMENDER
 # -------------------------
 def search_music(query, mode="artist", top_n=10):
 
@@ -94,6 +91,9 @@ def search_music(query, mode="artist", top_n=10):
     seen = set()
 
     for i in idxs:
+
+        if i >= len(df):
+            continue
 
         artist = df.iloc[i]['track_artist']
         genre = df.iloc[i]['playlist_genre']
@@ -120,9 +120,9 @@ def search_music(query, mode="artist", top_n=10):
         if len(results) == top_n:
             break
 
-    # FALLBACK (prevents empty output bug)
+    # FALLBACK (NO EMPTY OUTPUT)
     if len(results) < 3:
-        fallback = df.sample(10)
+        fallback = df.sample(min(10, len(df)))
 
         for i in fallback.index:
             results.append({
@@ -134,24 +134,35 @@ def search_music(query, mode="artist", top_n=10):
     return results
 
 # -------------------------
-# SIMILAR ARTISTS
+# SIMILAR ARTISTS (FIXED CRASH)
 # -------------------------
 def get_similar_artists(artist_name, top_n=5):
 
     idx_list = df[df['track_artist'] == artist_name].index
 
     if len(idx_list) == 0:
-        return []
+        return ["No similar artists found"]
 
     idx = idx_list[0]
 
-    sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
+    # SAFETY CHECK
+    if idx >= len(text_embeddings):
+        return ["Embedding mismatch error"]
+
+    sim_scores = cosine_similarity(
+        [text_embeddings[idx]],
+        text_embeddings
+    )[0]
+
     sorted_idx = np.argsort(sim_scores)[::-1]
 
     similar = []
     seen = set()
 
     for i in sorted_idx:
+
+        if i >= len(df):
+            continue
 
         artist = df.iloc[i]['track_artist']
 
