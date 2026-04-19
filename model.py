@@ -6,16 +6,36 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# LOAD DATASETS (FIXED MERGE)
+# LOAD DATASETS (MERGED)
 # -------------------------
 df1 = pd.read_csv("music_df.csv")
 df2 = pd.read_csv("spotify_songs.csv")
 
 df = pd.concat([df1, df2], ignore_index=True)
 
-# CLEANING
+# -------------------------
+# FIX DUPLICATES
+# -------------------------
 df.drop_duplicates(subset=["track_artist", "playlist_genre"], inplace=True)
-df.fillna(0, inplace=True)
+
+# -------------------------
+# SAFE FILLNA (FIX FOR YOUR ERROR)
+# -------------------------
+
+num_cols = df.select_dtypes(include=["number"]).columns
+str_cols = df.select_dtypes(include=["object", "string"]).columns
+
+df[num_cols] = df[num_cols].fillna(0)
+df[str_cols] = df[str_cols].fillna("Unknown")
+
+# -------------------------
+# OPTIONAL TYPE SAFETY (IMPORTANT FOR STREAMLIT CLOUD)
+# -------------------------
+if "track_artist" in df.columns:
+    df["track_artist"] = df["track_artist"].astype("string")
+
+if "playlist_genre" in df.columns:
+    df["playlist_genre"] = df["playlist_genre"].astype("string")
 
 # -------------------------
 # LOAD EMBEDDINGS
@@ -27,7 +47,7 @@ def load_embeddings():
 text_embeddings = load_embeddings()
 
 # -------------------------
-# MODEL
+# LOAD MODEL
 # -------------------------
 @st.cache_resource
 def load_model():
@@ -62,6 +82,7 @@ def search_music(query, mode="artist", top_n=10):
 
     audio = df['mood_score'].values
 
+    # NORMALIZE
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
     audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
@@ -99,9 +120,9 @@ def search_music(query, mode="artist", top_n=10):
         if len(results) == top_n:
             break
 
-    # FALLBACK (IMPORTANT)
+    # FALLBACK (prevents empty output bug)
     if len(results) < 3:
-        fallback = df.sort_values("mood_score", ascending=False).head(10)
+        fallback = df.sample(10)
 
         for i in fallback.index:
             results.append({
