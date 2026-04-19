@@ -3,7 +3,7 @@ import model
 from youtubesearchpython import VideosSearch
 
 # -------------------------
-# MODEL IMPORTS
+# LOAD MODEL FUNCTIONS
 # -------------------------
 search_music = model.search_music
 get_similar_artists = model.get_similar_artists
@@ -19,18 +19,39 @@ st.title("🎧 AI Music Recommender System")
 st.markdown("Transformer NLP + Deezer + YouTube Hybrid Engine")
 
 # -------------------------
-# YOUTUBE ENGINE (BULLETPROOF)
+# CLEAN YOUTUBE QUERY
+# -------------------------
+def build_youtube_query(song, artist):
+    song = str(song).split(",")[0]
+    artist = str(artist).split(",")[0]
+    return f"{artist} {song} official audio"
+
+# -------------------------
+# YOUTUBE ENGINE (ROBUST)
 # -------------------------
 def get_youtube_video(song, artist):
     try:
-        query = f"{song} {artist} official audio"
+        query = build_youtube_query(song, artist)
 
-        search = VideosSearch(query, limit=5)
+        search = VideosSearch(query, limit=10)
         results = search.result().get("result", [])
 
         for v in results:
             link = v.get("link", "")
 
+            if link:
+                return {
+                    "title": v.get("title", "Unknown"),
+                    "url": link,
+                    "thumbnail": v["thumbnails"][0]["url"]
+                }
+
+        # fallback search
+        fallback = VideosSearch(song + " audio", limit=5)
+        results2 = fallback.result().get("result", [])
+
+        for v in results2:
+            link = v.get("link", "")
             if link:
                 return {
                     "title": v.get("title", "Unknown"),
@@ -44,7 +65,7 @@ def get_youtube_video(song, artist):
         return None
 
 # -------------------------
-# MODE SELECT
+# MODE
 # -------------------------
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
@@ -75,7 +96,7 @@ if st.button("Generate 🎧"):
         """)
 
         # -------------------------
-        # DEEZER SECTION
+        # DEEZER
         # -------------------------
         deezer = get_deezer(r["song"])
 
@@ -84,26 +105,21 @@ if st.button("Generate 🎧"):
             st.audio(deezer["preview"])
 
         # -------------------------
-        # YOUTUBE SECTION (SAFE)
+        # YOUTUBE (FIXED)
         # -------------------------
         yt = get_youtube_video(r["song"], r["song"])
 
         if yt:
-
             st.markdown("### ▶️ Full Song (YouTube)")
-
             st.image(yt["thumbnail"])
 
-            # ALWAYS SAFE FALLBACK LINK (NEVER FAILS)
             st.markdown(
-                f"""
-                👉 [Watch on YouTube]({yt['url']})
-                """,
+                f"[▶ Watch on YouTube]({yt['url']})",
                 unsafe_allow_html=True
             )
 
         else:
-            st.markdown("⚠️ YouTube not available for this track")
+            st.markdown("🎧 YouTube not found — Deezer preview only")
 
 # -------------------------
 # SIMILAR ARTISTS
