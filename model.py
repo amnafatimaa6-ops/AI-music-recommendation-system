@@ -1,70 +1,54 @@
 import pandas as pd
 import numpy as np
 import pickle
-import streamlit as st
-import os
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
 # LOAD DATA
 # -------------------------
-df1 = pd.read_csv("music_df.csv")
-df2 = pd.read_csv("spotify_songs.csv")
-
-df = pd.concat([df1, df2], ignore_index=True)
-df = df.reset_index(drop=True)
-
-df.drop_duplicates(subset=["track_artist", "playlist_genre"], inplace=True)
-
-# SAFE CLEANING
-num_cols = df.select_dtypes(include=["number"]).columns
-str_cols = df.select_dtypes(include=["object", "string"]).columns
-
-df[num_cols] = df[num_cols].fillna(0)
-df[str_cols] = df[str_cols].fillna("Unknown")
+df = pd.read_csv("music_df.csv")
 
 # -------------------------
-# MODEL
+# LOAD EMBEDDINGS
 # -------------------------
-@st.cache_resource
-def load_model():
-    return SentenceTransformer('all-MiniLM-L6-v2')
+def load_embeddings():
+    with open("text_embeddings.pkl", "rb") as f:
+        return pickle.load(f)
 
-model = load_model()
-
-# -------------------------
-# EMBEDDINGS FILE
-# -------------------------
-EMBED_PATH = "text_embeddings.pkl"
-
-def build_embeddings():
-    df["text"] = df["track_artist"].astype(str) + " " + df["playlist_genre"].astype(str)
-    emb = model.encode(df["text"].tolist(), show_progress_bar=True)
-    pickle.dump(emb, open(EMBED_PATH, "wb"))
-    return emb
+text_embeddings = load_embeddings()
 
 # -------------------------
-# LOAD OR REBUILD EMBEDDINGS (FIX)
+# LOAD MODEL
 # -------------------------
-if os.path.exists(EMBED_PATH):
-    text_embeddings = pickle.load(open(EMBED_PATH, "rb"))
-
-    # AUTO FIX MISMATCH
-    if len(text_embeddings) != len(df):
-        print("⚠️ Mismatch detected → rebuilding embeddings...")
-        text_embeddings = build_embeddings()
-else:
-    print("⚠️ No embeddings found → building new ones...")
-    text_embeddings = build_embeddings()
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------
-# GENRE DISTRIBUTION
+# GENRE DISTRIBUTION (for balancing)
 # -------------------------
 genre_distribution = df['playlist_genre'].value_counts(normalize=True)
 
 # -------------------------
-# QUERY EXPANSION
+# MOOD BIAS ENGINE (FIX FOR POP BIAS)
+# -------------------------
+def mood_bias(query):
+    q = query.lower()
+
+    if "sad" in q:
+        return {"valence": -0.5, "energy": -0.2}
+    elif "happy" in q:
+        return {"valence": 0.5, "energy": 0.2}
+    elif "chill" in q:
+        return {"energy": -0.3}
+    elif "gym" in q or "hype" in q:
+        return {"energy": 0.6}
+    elif "love" in q:
+        return {"valence": 0.3}
+    else:
+        return {}
+
+# -------------------------
+# EXPAND QUERY (your original idea preserved)
 # -------------------------
 def expand_query(query, mode):
     if mode == "artist":
@@ -74,39 +58,71 @@ def expand_query(query, mode):
     return query
 
 # -------------------------
-# RECOMMENDER
+# MAIN RECOMMENDER (UPGRADED)
 # -------------------------
 def search_music(query, mode="artist", top_n=10):
 
     query = expand_query(query, mode)
 
+    # embeddings similarity
     query_vec = model.encode([query])
     sim = cosine_similarity(query_vec, text_embeddings)[0]
 
-    audio = df['mood_score'].values
+    # audio features
+    energy = df["energy"].values
+    valence = df["valence"].values
 
+    # normalize similarity
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
-    audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
-    base_score = 0.6 * sim + 0.4 * audio
+    # base score
+    base_score = 0.6 * sim + 0.4 * (df["mood_score"].values)
 
+    # -------------------------
+    # APPLY MOOD BIAS (IMPORTANT FIX)
+    # -------------------------
+    bias = mood_bias(query)
+
+    if "energy" in bias:
+        base_score += bias["energy"] * energy
+
+    if "valence" in bias:
+        base_score += bias["valence"] * valence
+
+    # -------------------------
+    # SORT
+    # -------------------------
     idxs = np.argsort(base_score)[::-1]
 
     results = []
-    seen = set()
+    seen_artists = set()
+    seen_genres = set()
 
     for i in idxs:
 
-        artist = df.iloc[i]['track_artist']
-        genre = df.iloc[i]['playlist_genre']
+        artist = df.iloc[i]["track_artist"]
+        genre = df.iloc[i]["playlist_genre"]
 
-        if artist in seen:
+        # -------------------------
+        # DIVERSITY CONTROL (CRITICAL FIX)
+        # -------------------------
+        if artist in seen_artists:
             continue
 
+        # avoid genre flooding
+        if genre in seen_genres and len(seen_genres) < 5:
+            continue
+
+        seen_artists.add(artist)
+        seen_genres.add(genre)
+
+        # genre penalty (keeps balance)
         penalty = genre_distribution.get(genre, 0)
+
         score = base_score[i] * (1 - penalty)
 
-        seen.add(artist)
+        # slight randomness for discovery
+        score += np.random.uniform(-0.02, 0.02)
 
         results.append({
             "song": artist,
@@ -120,25 +136,18 @@ def search_music(query, mode="artist", top_n=10):
     return results
 
 # -------------------------
-# SIMILAR ARTISTS (FIXED + SAFE)
+# SIMILAR ARTISTS (UNCHANGED LOGIC, SAFE VERSION)
 # -------------------------
 def get_similar_artists(artist_name, top_n=5):
 
-    idx_list = df[df['track_artist'] == artist_name].index
+    matches = df[df["track_artist"] == artist_name].index
 
-    if len(idx_list) == 0:
-        return ["No similar artists found"]
+    if len(matches) == 0:
+        return []
 
-    idx = idx_list[0]
+    idx = matches[0]
 
-    if idx >= len(text_embeddings):
-        return ["Rebuilding embeddings... restart app"]
-
-    sim_scores = cosine_similarity(
-        [text_embeddings[idx]],
-        text_embeddings
-    )[0]
-
+    sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
     sorted_idx = np.argsort(sim_scores)[::-1]
 
     similar = []
@@ -146,10 +155,7 @@ def get_similar_artists(artist_name, top_n=5):
 
     for i in sorted_idx:
 
-        if i >= len(df):
-            continue
-
-        artist = df.iloc[i]['track_artist']
+        artist = df.iloc[i]["track_artist"]
 
         if artist == artist_name:
             continue
