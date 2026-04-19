@@ -6,41 +6,16 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# LOAD MAIN DATA
+# LOAD DATASETS (FIXED MERGE)
 # -------------------------
-df = pd.read_csv("music_df.csv")
+df1 = pd.read_csv("music_df.csv")
+df2 = pd.read_csv("spotify_songs.csv")
 
-# -------------------------
-# MERGE EXTRA DATASET (KAGGLE)
-# -------------------------
-try:
-    extra_df = pd.read_csv("spotify_songs.csv")
+df = pd.concat([df1, df2], ignore_index=True)
 
-    # Keep only useful columns if they exist
-    keep_cols = [
-        "track_artist","playlist_genre","playlist_subgenre",
-        "energy","danceability","valence","tempo","loudness",
-        "speechiness","acousticness","instrumentalness"
-    ]
-
-    extra_df = extra_df[[c for c in keep_cols if c in extra_df.columns]]
-
-    # Fill missing
-    for col in keep_cols:
-        if col not in extra_df.columns:
-            extra_df[col] = 0
-
-    extra_df.fillna(0, inplace=True)
-
-    # Feature engineering (same style)
-    extra_df['mood_score'] = (extra_df['valence'] * 0.6) + (extra_df['energy'] * 0.4)
-
-    # Merge
-    df = pd.concat([df, extra_df], ignore_index=True)
-    df.drop_duplicates(inplace=True)
-
-except:
-    pass
+# CLEANING
+df.drop_duplicates(subset=["track_artist", "playlist_genre"], inplace=True)
+df.fillna(0, inplace=True)
 
 # -------------------------
 # LOAD EMBEDDINGS
@@ -52,7 +27,7 @@ def load_embeddings():
 text_embeddings = load_embeddings()
 
 # -------------------------
-# LOAD MODEL
+# MODEL
 # -------------------------
 @st.cache_resource
 def load_model():
@@ -61,7 +36,7 @@ def load_model():
 model = load_model()
 
 # -------------------------
-# GENRE BALANCE
+# GENRE DISTRIBUTION
 # -------------------------
 genre_distribution = df['playlist_genre'].value_counts(normalize=True)
 
@@ -76,7 +51,7 @@ def expand_query(query, mode):
     return query
 
 # -------------------------
-# MAIN SEARCH
+# MAIN RECOMMENDER (UNCHANGED LOGIC)
 # -------------------------
 def search_music(query, mode="artist", top_n=10):
 
@@ -87,7 +62,6 @@ def search_music(query, mode="artist", top_n=10):
 
     audio = df['mood_score'].values
 
-    # Normalize
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
     audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
@@ -125,7 +99,7 @@ def search_music(query, mode="artist", top_n=10):
         if len(results) == top_n:
             break
 
-    # FALLBACK SYSTEM
+    # FALLBACK (IMPORTANT)
     if len(results) < 3:
         fallback = df.sort_values("mood_score", ascending=False).head(10)
 
