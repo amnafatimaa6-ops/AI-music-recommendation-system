@@ -2,12 +2,11 @@ import streamlit as st
 import model
 
 # -------------------------
-# LOAD FUNCTIONS
+# LOAD MODEL FUNCTIONS
 # -------------------------
 search_music = model.search_music
 get_similar_artists = model.get_similar_artists
 get_deezer = model.get_deezer
-get_itunes = model.get_itunes
 df = model.df
 
 # -------------------------
@@ -16,7 +15,7 @@ df = model.df
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
 st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Deezer + iTunes Stable Engine")
+st.markdown("Transformer NLP + Deezer Engine (Stable Version)")
 
 # -------------------------
 # MODE
@@ -24,10 +23,10 @@ st.markdown("Transformer NLP + Deezer + iTunes Stable Engine")
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
 if mode == "🎤 Artist":
-    query = st.selectbox("Select Artist", sorted(df["track_artist"].unique()))
+    query = st.selectbox("Select Artist", sorted(df["track_artist"].unique()) if not df.empty else [])
     mode_key = "artist"
 else:
-    query = st.selectbox("Select Genre", sorted(df["playlist_genre"].unique()))
+    query = st.selectbox("Select Genre", sorted(df["playlist_genre"].unique()) if not df.empty else [])
     mode_key = "genre"
 
 # -------------------------
@@ -37,47 +36,30 @@ if st.button("Generate 🎧"):
 
     results = search_music(query, mode_key)
 
-    st.subheader("🎵 Recommendations")
+    if not results:
+        st.warning("No data available or model not loaded properly.")
+    else:
 
-    for r in results:
+        st.subheader("🎵 Recommendations")
 
-        st.markdown("---")
+        for r in results:
 
-        st.markdown(f"""
-        ## 🎵 {r['song']}
-        🎼 Genre: {r['genre']}  
-        ⭐ Score: {r['score']}
-        """)
+            st.markdown("---")
 
-        # -------------------------
-        # DEEZER
-        # -------------------------
-        deezer = get_deezer(r["song"])
+            st.markdown(f"""
+            ## 🎵 {r['song']}
+            🎼 Genre: {r['genre']}  
+            ⭐ Score: {r['score']}
+            """)
 
-        if deezer:
-            st.image(deezer["image"], width=250)
-            st.audio(deezer["preview"])
+            # -------------------------
+            # DEEZER
+            # -------------------------
+            deezer = get_deezer(r["song"])
 
-        # -------------------------
-        # ITUNES (MAIN FIX)
-        # -------------------------
-        itunes = get_itunes(r["song"], r["song"])
-
-        if itunes:
-            st.markdown("### 🎧 Full Track (iTunes)")
-
-            st.image(itunes["image"])
-
-            if itunes["preview"]:
-                st.audio(itunes["preview"])
-
-            st.markdown(
-                f"[🎵 Open Song]({itunes['url']})",
-                unsafe_allow_html=True
-            )
-
-        else:
-            st.markdown("🎧 No full preview available")
+            if deezer:
+                st.image(deezer["image"], width=250)
+                st.audio(deezer["preview"])
 
 # -------------------------
 # SIMILAR ARTISTS
@@ -95,4 +77,4 @@ if mode_key == "artist":
 # FOOTER
 # -------------------------
 st.markdown("---")
-st.markdown("💡 Deezer + iTunes Stable AI Music Engine")
+st.markdown("💡 Stable AI Music Engine (Crash-Proof Version)")
