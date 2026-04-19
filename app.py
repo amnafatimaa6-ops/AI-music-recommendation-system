@@ -6,26 +6,47 @@ import requests
 import model
 
 # -------------------------
-# LOAD MODEL FUNCTIONS
+# MODEL IMPORTS
 # -------------------------
 search_music = model.search_music
 get_similar_artists = model.get_similar_artists
 df = model.df
 
 # -------------------------
-# USER DB (JSON STORAGE)
+# USER DB FILE
 # -------------------------
 USER_DB = "users.json"
 
+# -------------------------
+# SAFE LOAD USERS (FIXED JSON ERROR)
+# -------------------------
 def load_users():
     if not os.path.exists(USER_DB):
         return {}
-    with open(USER_DB, "r") as f:
-        return json.load(f)
 
+    try:
+        with open(USER_DB, "r") as f:
+            content = f.read().strip()
+
+            if not content:
+                return {}
+
+            return json.loads(content)
+
+    except json.JSONDecodeError:
+        return {}
+
+# -------------------------
+# SAVE USERS
+# -------------------------
 def save_users(data):
     with open(USER_DB, "w") as f:
         json.dump(data, f, indent=4)
+
+# AUTO REPAIR EMPTY FILE
+if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
+    with open(USER_DB, "w") as f:
+        json.dump({}, f)
 
 users = load_users()
 
@@ -77,7 +98,7 @@ if email:
     st.write(f"🎧 Playlists: {len(users[email]['playlists'])}")
 
 # -------------------------
-# MODE SELECTION
+# MODE
 # -------------------------
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
@@ -107,7 +128,7 @@ def get_deezer(song):
     }
 
 # -------------------------
-# GENERATE PLAYLIST
+# GENERATE
 # -------------------------
 if st.button("Generate Playlist 🎧"):
 
@@ -131,7 +152,9 @@ if st.button("Generate Playlist 🎧"):
             </div>
             """, unsafe_allow_html=True)
 
-            # SAVE BUTTON (FIXED PERSISTENCE)
+            # -------------------------
+            # SAVE PLAYLIST (FIXED)
+            # -------------------------
             if email:
                 if st.button(f"➕ Save {i}"):
                     users[email]["playlists"].append(r)
@@ -164,7 +187,7 @@ if st.button("Generate Playlist 🎧"):
                 """, unsafe_allow_html=True)
 
 # -------------------------
-# SHOW PLAYLIST
+# PLAYLIST VIEW
 # -------------------------
 if email:
     st.subheader("📂 Your Playlist")
