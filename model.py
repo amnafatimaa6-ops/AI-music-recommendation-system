@@ -25,13 +25,13 @@ genre_distribution = df["playlist_genre"].value_counts(normalize=True)
 # -------------------------
 def expand_query(query, mode):
     if mode == "artist":
-        return query + " songs albums music artist"
+        return query + " songs music albums artist"
     if mode == "genre":
-        return query + " top playlist songs"
+        return query + " playlist top songs"
     return query
 
 # -------------------------
-# MAIN RECOMMENDER
+# RECOMMENDER
 # -------------------------
 def search_music(query, mode="artist", top_n=10):
 
@@ -50,7 +50,6 @@ def search_music(query, mode="artist", top_n=10):
 
     results = []
     seen = set()
-
     genre_count = {}
 
     for i in idxs:
@@ -97,7 +96,7 @@ def get_similar_artists(artist_name, top_n=5):
     sorted_idx = np.argsort(sim_scores)[::-1]
 
     seen = set()
-    results = []
+    out = []
 
     for i in sorted_idx:
 
@@ -110,12 +109,12 @@ def get_similar_artists(artist_name, top_n=5):
             continue
 
         seen.add(artist)
-        results.append(artist)
+        out.append(artist)
 
-        if len(results) == top_n:
+        if len(out) == top_n:
             break
 
-    return results
+    return out
 
 # -------------------------
 # DEEZER API
