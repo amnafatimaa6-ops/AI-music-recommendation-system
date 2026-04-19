@@ -6,7 +6,7 @@ import requests
 import model
 
 # -------------------------
-# MODEL IMPORTS
+# MODEL
 # -------------------------
 search_music = model.search_music
 get_similar_artists = model.get_similar_artists
@@ -35,7 +35,7 @@ def save_users(data):
     with open(USER_DB, "w") as f:
         json.dump(data, f, indent=4)
 
-# auto repair
+# auto create safe file
 if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
     with open(USER_DB, "w") as f:
         json.dump({}, f)
@@ -43,7 +43,7 @@ if not os.path.exists(USER_DB) or os.stat(USER_DB).st_size == 0:
 users = load_users()
 
 # -------------------------
-# SESSION STATE (IMPORTANT FIX)
+# SESSION STATE
 # -------------------------
 if "email" not in st.session_state:
     st.session_state.email = None
@@ -51,8 +51,11 @@ if "email" not in st.session_state:
 if "users" not in st.session_state:
     st.session_state.users = users
 
+if "selected_song" not in st.session_state:
+    st.session_state.selected_song = None
+
 # -------------------------
-# PAGE CONFIG
+# PAGE
 # -------------------------
 st.set_page_config(page_title="AI Music Recommender", layout="wide")
 
@@ -92,7 +95,7 @@ if email:
     st.sidebar.success(f"Logged in: {email}")
 
 # -------------------------
-# USER PROFILE SLIDERS
+# PROFILE SLIDERS
 # -------------------------
 st.sidebar.subheader("🎛️ Profile Controls")
 
@@ -101,7 +104,7 @@ popularity_pref = st.sidebar.slider("Popularity Bias", 0.0, 1.0, 0.5)
 diversity_pref = st.sidebar.slider("Discovery Mode", 0.0, 1.0, 0.5)
 
 # -------------------------
-# PROFILE VIEW
+# PROFILE
 # -------------------------
 if st.session_state.email:
     st.subheader("👤 Profile")
@@ -121,12 +124,12 @@ if mode == "🎤 Artist":
     query = st.selectbox("Select Artist", sorted(df['track_artist'].dropna().unique()))
     mode_key = "artist"
 
-elif mode == "🎼 Genre":
+else:
     query = st.selectbox("Select Genre", sorted(df['playlist_genre'].dropna().unique()))
     mode_key = "genre"
 
 # -------------------------
-# DEEZER API
+# DEEZER
 # -------------------------
 def get_deezer(song):
     url = f"https://api.deezer.com/search?q={song}"
@@ -168,45 +171,59 @@ if st.button("Generate Playlist 🎧"):
             """, unsafe_allow_html=True)
 
             # -------------------------
-            # SAVE BUTTON (FIXED PROPERLY)
+            # SELECT SONG (FIXED FLOW)
             # -------------------------
-            if st.session_state.email:
-
-                if st.button("➕ Save to Playlist", key=f"save_{i}"):
-
-                    user = st.session_state.email
-                    st.session_state.users[user]["playlists"].append(r)
-                    save_users(st.session_state.users)
-
-                    st.success("Saved to playlist 🎧")
+            if st.button("🎯 Select", key=f"select_{i}"):
+                st.session_state.selected_song = r
+                st.success(f"Selected: {r['song']}")
 
             if deezer:
                 st.image(deezer["image"], use_container_width=True)
                 st.audio(deezer["preview"])
 
-    # -------------------------
-    # SIMILAR ARTISTS
-    # -------------------------
-    if mode_key == "artist":
+# -------------------------
+# SAVE SELECTED SONG (IMPORTANT FIX)
+# -------------------------
+if st.session_state.email and st.session_state.selected_song:
 
-        st.subheader("🎤 Similar Artists")
+    st.markdown("### 💾 Save Selected Song")
 
-        similar = get_similar_artists(query)
+    st.info(f"🎵 {st.session_state.selected_song['song']}")
 
-        cols2 = st.columns(max(1, len(similar)))
+    if st.button("➕ Save to Playlist"):
 
-        for i, artist in enumerate(similar):
+        user = st.session_state.email
 
-            with cols2[i % len(cols2)]:
+        st.session_state.users[user]["playlists"].append(st.session_state.selected_song)
+        save_users(st.session_state.users)
 
-                st.markdown(f"""
-                <div class="card" style="text-align:center;">
-                    <b>{artist}</b>
-                </div>
-                """, unsafe_allow_html=True)
+        st.success("Saved successfully 🎧")
+
+        st.session_state.selected_song = None
 
 # -------------------------
-# PLAYLIST VIEW
+# SIMILAR ARTISTS
+# -------------------------
+if mode_key == "artist":
+
+    st.subheader("🎤 Similar Artists")
+
+    similar = get_similar_artists(query)
+
+    cols2 = st.columns(max(1, len(similar)))
+
+    for i, artist in enumerate(similar):
+
+        with cols2[i % len(cols2)]:
+
+            st.markdown(f"""
+            <div class="card" style="text-align:center;">
+                <b>{artist}</b>
+            </div>
+            """, unsafe_allow_html=True)
+
+# -------------------------
+# PLAYLIST
 # -------------------------
 if st.session_state.email:
 
@@ -230,5 +247,5 @@ if st.session_state.email:
 # FOOTER
 # -------------------------
 st.markdown("---")
-st.markdown("💡 Built with Transformer NLP + Audio Intelligence + Deezer API")
+st.markdown("💡 Transformer NLP + Deezer + Audio Intelligence")
 st.markdown("🚀 Spotify-style AI Discovery Engine")
