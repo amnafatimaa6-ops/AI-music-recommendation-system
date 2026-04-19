@@ -3,7 +3,7 @@ import model
 from youtubesearchpython import VideosSearch
 
 # -------------------------
-# IMPORT MODEL
+# MODEL IMPORTS
 # -------------------------
 search_music = model.search_music
 get_similar_artists = model.get_similar_artists
@@ -19,19 +19,22 @@ st.title("🎧 AI Music Recommender System")
 st.markdown("Transformer NLP + Deezer + YouTube Hybrid Engine")
 
 # -------------------------
-# YOUTUBE FIXED ENGINE
+# YOUTUBE ENGINE (BULLETPROOF)
 # -------------------------
 def get_youtube_video(song, artist):
     try:
         query = f"{song} {artist} official audio"
-        search = VideosSearch(query, limit=3)
+
+        search = VideosSearch(query, limit=5)
         results = search.result().get("result", [])
 
         for v in results:
-            if "youtube.com" in v.get("link", ""):
+            link = v.get("link", "")
+
+            if link:
                 return {
-                    "title": v.get("title"),
-                    "url": v.get("link"),
+                    "title": v.get("title", "Unknown"),
+                    "url": link,
                     "thumbnail": v["thumbnails"][0]["url"]
                 }
 
@@ -41,7 +44,7 @@ def get_youtube_video(song, artist):
         return None
 
 # -------------------------
-# MODE
+# MODE SELECT
 # -------------------------
 mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
 
@@ -72,7 +75,7 @@ if st.button("Generate 🎧"):
         """)
 
         # -------------------------
-        # DEEZER
+        # DEEZER SECTION
         # -------------------------
         deezer = get_deezer(r["song"])
 
@@ -81,18 +84,26 @@ if st.button("Generate 🎧"):
             st.audio(deezer["preview"])
 
         # -------------------------
-        # YOUTUBE (FIXED SAFE OUTPUT)
+        # YOUTUBE SECTION (SAFE)
         # -------------------------
         yt = get_youtube_video(r["song"], r["song"])
 
         if yt:
+
             st.markdown("### ▶️ Full Song (YouTube)")
+
             st.image(yt["thumbnail"])
 
+            # ALWAYS SAFE FALLBACK LINK (NEVER FAILS)
             st.markdown(
-                f"[▶️ Watch on YouTube]({yt['url']})",
+                f"""
+                👉 [Watch on YouTube]({yt['url']})
+                """,
                 unsafe_allow_html=True
             )
+
+        else:
+            st.markdown("⚠️ YouTube not available for this track")
 
 # -------------------------
 # SIMILAR ARTISTS
