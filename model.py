@@ -5,124 +5,110 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# LOAD DATA
+# DATA
 # -------------------------
 df = pd.read_csv("music_df.csv")
 
-# -------------------------
-# LOAD EMBEDDINGS
-# -------------------------
-def load_embeddings():
-    with open("text_embeddings.pkl", "rb") as f:
-        return pickle.load(f)
+with open("text_embeddings.pkl", "rb") as f:
+    text_embeddings = pickle.load(f)
 
-text_embeddings = load_embeddings()
-
-# -------------------------
-# LOAD MODEL
-# -------------------------
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------
-# GENRE DISTRIBUTION (for balancing)
+# GLOBAL GENRE STATS
 # -------------------------
-genre_distribution = df['playlist_genre'].value_counts(normalize=True)
+genre_distribution = df["playlist_genre"].value_counts(normalize=True)
 
 # -------------------------
-# MOOD BIAS ENGINE (FIX FOR POP BIAS)
+# 🧠 LAYER 1: EMOTION BRAIN
 # -------------------------
-def mood_bias(query):
+MOOD_MAP = {
+    "energetic": {"energy": 0.7, "valence": 0.3},
+    "sad": {"energy": -0.5, "valence": -0.6},
+    "happy": {"energy": 0.4, "valence": 0.7},
+    "chill": {"energy": -0.5},
+    "romantic": {"valence": 0.5},
+    "party": {"energy": 0.8},
+    "focus": {"energy": -0.2}
+}
+
+def get_mood_vector(query):
     q = query.lower()
-
-    if "sad" in q:
-        return {"valence": -0.5, "energy": -0.2}
-    elif "happy" in q:
-        return {"valence": 0.5, "energy": 0.2}
-    elif "chill" in q:
-        return {"energy": -0.3}
-    elif "gym" in q or "hype" in q:
-        return {"energy": 0.6}
-    elif "love" in q:
-        return {"valence": 0.3}
-    else:
-        return {}
+    for mood in MOOD_MAP:
+        if mood in q:
+            return MOOD_MAP[mood]
+    return {}
 
 # -------------------------
-# EXPAND QUERY (your original idea preserved)
+# 🧠 LAYER 2: QUERY EXPANSION
 # -------------------------
 def expand_query(query, mode):
     if mode == "artist":
         return query + " similar artists songs albums music"
     if mode == "genre":
-        return query + " playlist top songs artists"
+        return query + " top playlist songs trending"
     return query
 
 # -------------------------
-# MAIN RECOMMENDER (UPGRADED)
+# 🚀 MAIN BRAIN ENGINE
 # -------------------------
 def search_music(query, mode="artist", top_n=10):
 
-    query = expand_query(query, mode)
+    query_expanded = expand_query(query, mode)
 
-    # embeddings similarity
-    query_vec = model.encode([query])
+    query_vec = model.encode([query_expanded])
     sim = cosine_similarity(query_vec, text_embeddings)[0]
 
-    # audio features
-    energy = df["energy"].values
-    valence = df["valence"].values
-
-    # normalize similarity
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
 
-    # base score
-    base_score = 0.6 * sim + 0.4 * (df["mood_score"].values)
+    audio_energy = df["energy"].values
+    audio_valence = df["valence"].values
+
+    base_score = 0.65 * sim + 0.35 * df["mood_score"].values
 
     # -------------------------
-    # APPLY MOOD BIAS (IMPORTANT FIX)
+    # 🧠 APPLY MOOD BRAIN
     # -------------------------
-    bias = mood_bias(query)
+    mood = get_mood_vector(query)
 
-    if "energy" in bias:
-        base_score += bias["energy"] * energy
+    if "energy" in mood:
+        base_score += mood["energy"] * audio_energy
 
-    if "valence" in bias:
-        base_score += bias["valence"] * valence
+    if "valence" in mood:
+        base_score += mood["valence"] * audio_valence
 
     # -------------------------
-    # SORT
+    # SORTING
     # -------------------------
     idxs = np.argsort(base_score)[::-1]
 
     results = []
+
+    # 🧠 LAYER 3: DIVERSITY BRAIN
+    genre_count = {}
     seen_artists = set()
-    seen_genres = set()
 
     for i in idxs:
 
         artist = df.iloc[i]["track_artist"]
         genre = df.iloc[i]["playlist_genre"]
 
-        # -------------------------
-        # DIVERSITY CONTROL (CRITICAL FIX)
-        # -------------------------
+        # avoid duplicates
         if artist in seen_artists:
             continue
 
-        # avoid genre flooding
-        if genre in seen_genres and len(seen_genres) < 5:
+        # HARD genre limit (Spotify style)
+        if genre_count.get(genre, 0) >= 2:
             continue
 
+        genre_count[genre] = genre_count.get(genre, 0) + 1
         seen_artists.add(artist)
-        seen_genres.add(genre)
 
-        # genre penalty (keeps balance)
-        penalty = genre_distribution.get(genre, 0)
+        # rarity boost (underground discovery)
+        rarity_boost = np.log1p(1 / (genre_distribution.get(genre, 0) + 1e-6))
 
-        score = base_score[i] * (1 - penalty)
-
-        # slight randomness for discovery
-        score += np.random.uniform(-0.02, 0.02)
+        score = base_score[i] + 0.1 * rarity_boost
+        score += np.random.uniform(-0.015, 0.015)
 
         results.append({
             "song": artist,
@@ -136,22 +122,22 @@ def search_music(query, mode="artist", top_n=10):
     return results
 
 # -------------------------
-# SIMILAR ARTISTS (UNCHANGED LOGIC, SAFE VERSION)
+# 🎤 SIMILAR ARTISTS ENGINE (IMPROVED)
 # -------------------------
 def get_similar_artists(artist_name, top_n=5):
 
-    matches = df[df["track_artist"] == artist_name].index
+    idxs = df[df["track_artist"] == artist_name].index
 
-    if len(matches) == 0:
+    if len(idxs) == 0:
         return []
 
-    idx = matches[0]
+    idx = idxs[0]
 
     sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
     sorted_idx = np.argsort(sim_scores)[::-1]
 
-    similar = []
     seen = set()
+    results = []
 
     for i in sorted_idx:
 
@@ -164,9 +150,9 @@ def get_similar_artists(artist_name, top_n=5):
             continue
 
         seen.add(artist)
-        similar.append(artist)
+        results.append(artist)
 
-        if len(similar) == top_n:
+        if len(results) == top_n:
             break
 
-    return similar
+    return results
