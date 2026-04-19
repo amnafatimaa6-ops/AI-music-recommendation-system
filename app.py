@@ -3,7 +3,7 @@ import model
 from youtubesearchpython import VideosSearch
 
 # -------------------------
-# IMPORT MODEL FUNCTIONS
+# IMPORT MODEL
 # -------------------------
 search_music = model.search_music
 get_similar_artists = model.get_similar_artists
@@ -19,22 +19,21 @@ st.title("🎧 AI Music Recommender System")
 st.markdown("Transformer NLP + Deezer + YouTube Hybrid Engine")
 
 # -------------------------
-# YOUTUBE FUNCTION (FIXED)
+# YOUTUBE FIXED ENGINE
 # -------------------------
 def get_youtube_video(song, artist):
     try:
         query = f"{song} {artist} official audio"
-        search = VideosSearch(query, limit=1)
-        result = search.result()
+        search = VideosSearch(query, limit=3)
+        results = search.result().get("result", [])
 
-        if result and result["result"]:
-            v = result["result"][0]
-
-            return {
-                "title": v["title"],
-                "url": v["link"],
-                "thumbnail": v["thumbnails"][0]["url"]
-            }
+        for v in results:
+            if "youtube.com" in v.get("link", ""):
+                return {
+                    "title": v.get("title"),
+                    "url": v.get("link"),
+                    "thumbnail": v["thumbnails"][0]["url"]
+                }
 
         return None
 
@@ -73,7 +72,7 @@ if st.button("Generate 🎧"):
         """)
 
         # -------------------------
-        # DEEZER (COVER + PREVIEW)
+        # DEEZER
         # -------------------------
         deezer = get_deezer(r["song"])
 
@@ -82,14 +81,18 @@ if st.button("Generate 🎧"):
             st.audio(deezer["preview"])
 
         # -------------------------
-        # YOUTUBE (FULL SONG FIXED)
+        # YOUTUBE (FIXED SAFE OUTPUT)
         # -------------------------
         yt = get_youtube_video(r["song"], r["song"])
 
         if yt:
             st.markdown("### ▶️ Full Song (YouTube)")
             st.image(yt["thumbnail"])
-            st.video(yt["url"])
+
+            st.markdown(
+                f"[▶️ Watch on YouTube]({yt['url']})",
+                unsafe_allow_html=True
+            )
 
 # -------------------------
 # SIMILAR ARTISTS
@@ -100,8 +103,8 @@ if mode_key == "artist":
 
     similar = get_similar_artists(query)
 
-    for artist in similar:
-        st.write("🎤", artist)
+    for a in similar:
+        st.write("🎤", a)
 
 # -------------------------
 # FOOTER
