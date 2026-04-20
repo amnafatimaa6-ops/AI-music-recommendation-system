@@ -23,7 +23,7 @@ if query:
         selected = st.selectbox("Suggestions", suggestions)
 
 # -------------------------
-# GENERATE RESULTS
+# GENERATE
 # -------------------------
 if st.button("Generate 🎧") and selected:
 
@@ -72,7 +72,7 @@ if selected:
 # -------------------------
 # WEEKLY TRENDING
 # -------------------------
-st.subheader("🔥 Weekly AI Trending")
+st.subheader("🔥 Weekly Trending AI Songs")
 
 weekly = model.get_weekly_trending()
 
