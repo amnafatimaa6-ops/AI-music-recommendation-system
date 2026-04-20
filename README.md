@@ -1,5 +1,5 @@
 
-🎧✨ #AI Music Recommender System
+# AI Music Recommender System 🎧✨
 
 Transformer NLP + Audio Intelligence + Hybrid Discovery Engine
 
@@ -30,10 +30,15 @@ It combines:
 🧠 Tech Stack
 
 Python 🐍
+
 Streamlit 🎈
+
 Sentence Transformers (SBERT) 🤖
+
 Scikit-learn 📊
+
 Pandas / NumPy 📁
+
 Deezer API 🎧
 
 📊 Dataset
@@ -41,32 +46,48 @@ Deezer API 🎧
 Spotify Audio Features Dataset including:
 
 energy
+
 danceability
+
 valence
+
 tempo
+
 loudness
+
 speechiness
+
 acousticness
+
 instrumentalness
+
 genre
+
 artist
 
 🧠 Model Architecture
 1. Text Understanding (Transformer NLP)
 Combines track_artist + genre + metadata
 Encodes using Sentence-BERT embeddings
-2. Audio Intelligence Layer
+
+3. Audio Intelligence Layer
 
 Engineered features include:
 
 mood_score
+
 intensity score
+
 danceability index
+
 genre signals
+
 3. Hybrid Scoring System
 final_score = 0.6 × text_similarity + 0.4 × audio_similarity
+
 🎧 Key Features
 🎤 Artist Mode
+
 Select an artist
 Get similar artists
 Get recommended tracks
@@ -78,10 +99,15 @@ Discover related artists
 🌌 Explore Mode
 Type any mood / vibe / keyword
 AI interprets intent semantically
+
 ▶️ Music Preview System
+
 🎨 Album covers (Deezer API)
+
 🎧 30-second audio previews
+
 🎵 Real-time song playback
+
 🧠 Key Innovations
 
 This is NOT a basic ML project.
