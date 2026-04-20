@@ -6,7 +6,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# LOAD & MERGE DATASETS
+# LOAD DATASETS (3 FILES)
 # -------------------------
 def load_data():
 
@@ -64,7 +64,7 @@ def load_data():
 df = load_data()
 
 # -------------------------
-# LOAD EMBEDDINGS
+# EMBEDDINGS + MODEL
 # -------------------------
 try:
     with open("text_embeddings.pkl", "rb") as f:
@@ -72,72 +72,21 @@ try:
 except:
     text_embeddings = None
 
-# -------------------------
-# LOAD MODEL
-# -------------------------
 try:
     model = SentenceTransformer("all-MiniLM-L6-v2")
 except:
     model = None
 
 # -------------------------
-# SEARCH FUNCTION (FIXED)
+# MAIN SEARCH ENGINE
 # -------------------------
 def search_music(query, top_n=10):
 
     if df.empty:
         return []
 
-    use_embeddings = model is not None and text_embeddings is not None
+    if model is None or text_embeddings is None:
 
-    try:
-        if use_embeddings:
-
-            query_vec = model.encode([query])
-            sim = cosine_similarity(query_vec, text_embeddings)[0]
-
-            # 🔥 FIX: MATCH LENGTHS
-            min_len = min(len(sim), len(df))
-
-            sim = sim[:min_len]
-            audio = df["mood_score"].values[:min_len]
-
-            # normalize
-            sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
-            audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
-
-            base = 0.6 * sim + 0.4 * audio
-
-            idxs = np.argsort(base)[::-1]
-
-            results = []
-            seen = set()
-
-            for i in idxs:
-
-                artist = df.iloc[i]["track_artist"]
-
-                if artist in seen:
-                    continue
-
-                seen.add(artist)
-
-                results.append({
-                    "song": artist,
-                    "genre": df.iloc[i]["playlist_genre"],
-                    "score": round(float(base[i]), 3)
-                })
-
-                if len(results) == top_n:
-                    break
-
-            return results
-
-        else:
-            raise Exception("No embeddings")
-
-    except:
-        # 🔥 FALLBACK SEARCH
         filtered = df[df["track_artist"].str.contains(str(query), case=False, na=False)]
 
         if filtered.empty:
@@ -152,11 +101,110 @@ def search_music(query, top_n=10):
             for _, row in filtered.head(top_n).iterrows()
         ]
 
+    query_vec = model.encode([query])
+    sim = cosine_similarity(query_vec, text_embeddings)[0]
+
+    min_len = min(len(sim), len(df))
+
+    sim = sim[:min_len]
+    audio = df["mood_score"].values[:min_len]
+
+    sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
+    audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
+
+    base = 0.6 * sim + 0.4 * audio
+
+    idxs = np.argsort(base)[::-1]
+
+    results = []
+    seen = set()
+
+    for i in idxs:
+
+        artist = df.iloc[i]["track_artist"]
+
+        if artist in seen:
+            continue
+
+        seen.add(artist)
+
+        results.append({
+            "song": artist,
+            "genre": df.iloc[i]["playlist_genre"],
+            "score": round(float(base[i]), 3)
+        })
+
+        if len(results) == top_n:
+            break
+
+    return results
+
+
+# -------------------------
+# SIMILAR ARTISTS
+# -------------------------
+def get_similar_artists(artist, top_n=5):
+
+    if df.empty or text_embeddings is None:
+        return []
+
+    try:
+        idxs = df[df["track_artist"] == artist].index
+
+        if len(idxs) == 0:
+            return []
+
+        idx = idxs[0]
+
+        sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
+        sorted_idx = np.argsort(sim_scores)[::-1]
+
+        out = []
+        seen = set()
+
+        for i in sorted_idx:
+
+            a = df.iloc[i]["track_artist"]
+
+            if a == artist or a in seen:
+                continue
+
+            seen.add(a)
+            out.append(a)
+
+            if len(out) == top_n:
+                break
+
+        return out
+
+    except:
+        return []
+
+
+# -------------------------
+# WEEKLY TRENDING AI
+# -------------------------
+def get_weekly_trending(top_n=10):
+
+    temp = df.copy()
+    temp["trend"] = temp["mood_score"] + np.random.rand(len(temp)) * 0.3
+
+    top = temp.sort_values("trend", ascending=False).head(top_n)
+
+    return [
+        {
+            "song": row["track_artist"],
+            "genre": row["playlist_genre"]
+        }
+        for _, row in top.iterrows()
+    ]
+
 
 # -------------------------
 # DEEZER API
 # -------------------------
 def get_deezer(song):
+
     try:
         url = f"https://api.deezer.com/search?q={song}"
         res = requests.get(url).json()
