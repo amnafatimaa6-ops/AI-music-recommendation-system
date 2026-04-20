@@ -2,62 +2,66 @@ import pandas as pd
 import numpy as np
 import pickle
 import requests
-import urllib.parse
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
-# -------------------------
-# LOAD DATA SAFELY
-# -------------------------
+# LOAD DATA
 df = pd.read_csv("music_df.csv")
 
-# -------------------------
-# LOAD EMBEDDINGS SAFELY
-# -------------------------
 with open("text_embeddings.pkl", "rb") as f:
     text_embeddings = pickle.load(f)
 
-# -------------------------
-# TRANSFORMER MODEL
-# -------------------------
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------
-# SEARCH MUSIC ENGINE
+# CORE SEARCH (FIXED DIVERSITY)
 # -------------------------
-def search_music(query, mode="artist", top_n=10):
+def search_music(query, top_n=10):
 
     query_vec = model.encode([query])
-
     sim = cosine_similarity(query_vec, text_embeddings)[0]
 
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
 
     audio = df["mood_score"].values
+    base = 0.6 * sim + 0.4 * audio
 
-    base_score = 0.6 * sim + 0.4 * audio
-
-    idxs = np.argsort(base_score)[::-1]
+    idxs = np.argsort(base)[::-1]
 
     results = []
+    seen_artists = set()
+    genre_count = {}
 
-    for i in idxs[:top_n]:
+    for i in idxs:
+        artist = df.iloc[i]["track_artist"]
+        genre = df.iloc[i]["playlist_genre"]
+
+        if artist in seen_artists:
+            continue
+
+        if genre_count.get(genre, 0) >= 2:
+            continue
+
+        seen_artists.add(artist)
+        genre_count[genre] = genre_count.get(genre, 0) + 1
 
         results.append({
-            "song": df.iloc[i]["track_artist"],
-            "genre": df.iloc[i]["playlist_genre"],
-            "score": round(float(base_score[i]), 3)
+            "song": artist,
+            "genre": genre,
+            "score": round(float(base[i]), 3)
         })
+
+        if len(results) == top_n:
+            break
 
     return results
 
 # -------------------------
-# SIMILAR ARTISTS ENGINE
+# SIMILAR ARTISTS
 # -------------------------
-def get_similar_artists(artist_name, top_n=5):
+def get_similar_artists(artist, top_n=5):
 
-    idxs = df[df["track_artist"] == artist_name].index
-
+    idxs = df[df["track_artist"] == artist].index
     if len(idxs) == 0:
         return []
 
@@ -70,17 +74,13 @@ def get_similar_artists(artist_name, top_n=5):
     out = []
 
     for i in sorted_idx:
+        a = df.iloc[i]["track_artist"]
 
-        artist = df.iloc[i]["track_artist"]
-
-        if artist == artist_name:
+        if a == artist or a in seen:
             continue
 
-        if artist in seen:
-            continue
-
-        seen.add(artist)
-        out.append(artist)
+        seen.add(a)
+        out.append(a)
 
         if len(out) == top_n:
             break
@@ -88,7 +88,24 @@ def get_similar_artists(artist_name, top_n=5):
     return out
 
 # -------------------------
-# DEEZER API (ALBUM + PREVIEW)
+# WEEKLY AI PICKS (TREND STYLE)
+# -------------------------
+def weekly_ai_picks(top_n=10):
+
+    sample = df.sample(frac=0.2, random_state=42)
+
+    picks = sample.sort_values("mood_score", ascending=False).head(top_n)
+
+    return [
+        {
+            "song": row["track_artist"],
+            "genre": row["playlist_genre"]
+        }
+        for _, row in picks.iterrows()
+    ]
+
+# -------------------------
+# DEEZER
 # -------------------------
 def get_deezer(song):
     try:
@@ -103,48 +120,6 @@ def get_deezer(song):
         return {
             "image": t["album"]["cover_big"],
             "preview": t["preview"]
-        }
-
-    except:
-        return None
-
-# -------------------------
-# ITUNES API (FULL TRACK SAFE)
-# -------------------------
-def get_itunes(song, artist):
-    try:
-        query = urllib.parse.quote(f"{song} {artist}")
-        url = f"https://itunes.apple.com/search?term={query}&limit=1"
-
-        res = requests.get(url).json()
-
-        if res["resultCount"] > 0:
-            item = res["results"][0]
-
-            return {
-                "track": item.get("trackName"),
-                "artist": item.get("artistName"),
-                "preview": item.get("previewUrl"),
-                "image": item.get("artworkUrl100"),
-                "url": item.get("trackViewUrl")
-            }
-
-        return None
-
-    except:
-        return None
-
-# -------------------------
-# YOUTUBE SAFE LINK (NO SCRAPING)
-# -------------------------
-def get_youtube(song, artist):
-    try:
-        query = f"{artist} {song} official audio"
-        url = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(query)
-
-        return {
-            "query": query,
-            "url": url
         }
 
     except:
