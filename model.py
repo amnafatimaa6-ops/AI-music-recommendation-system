@@ -1,138 +1,124 @@
 import pandas as pd
 import numpy as np
+import pickle
 import requests
+from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# LOAD DATASETS
+# SAFE LOAD DATA
 # -------------------------
-def load_data():
-
-    files = [
-        "data/music_df.csv",
-        "data/spotify_songs.csv",
-        "data/data_by_artist.csv"
-    ]
-
-    dfs = []
-
-    for f in files:
-        try:
-            dfs.append(pd.read_csv(f))
-        except:
-            pass
-
-    df = pd.concat(dfs, ignore_index=True)
-
-    # normalize columns
-    if "track_artist" not in df.columns:
-        if "artist" in df.columns:
-            df["track_artist"] = df["artist"]
-        elif "artists" in df.columns:
-            df["track_artist"] = df["artists"]
-
-    if "track_name" not in df.columns:
-        if "song" in df.columns:
-            df["track_name"] = df["song"]
-        else:
-            df["track_name"] = df["track_artist"]
-
-    if "playlist_genre" not in df.columns:
-        if "genre" in df.columns:
-            df["playlist_genre"] = df["genre"]
-        else:
-            df["playlist_genre"] = "unknown"
-
-    df = df.drop_duplicates(subset=["track_artist", "track_name"])
-    df = df.reset_index(drop=True)
-
-    return df
-
-
-df = load_data()
-
+try:
+    df = pd.read_csv("music_df.csv")
+except:
+    df = pd.DataFrame(columns=["track_artist", "playlist_genre", "mood_score"])
 
 # -------------------------
-# 🔍 SEARCH (CLEAN)
+# SAFE LOAD EMBEDDINGS
+# -------------------------
+try:
+    with open("text_embeddings.pkl", "rb") as f:
+        text_embeddings = pickle.load(f)
+except:
+    text_embeddings = None
+
+# -------------------------
+# SAFE LOAD MODEL
+# -------------------------
+try:
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+except:
+    model = None
+
+# -------------------------
+# SEARCH (SAFE)
 # -------------------------
 def search_music(query, top_n=10):
 
-    q = query.lower()
+    if model is None or text_embeddings is None or df.empty:
+        return []
 
-    mask = (
-        df["track_artist"].str.lower().str.contains(q) |
-        df["track_name"].str.lower().str.contains(q)
-    )
+    try:
+        query_vec = model.encode([query])
+        sim = cosine_similarity(query_vec, text_embeddings)[0]
 
-    results = df[mask].head(top_n)
+        sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
+        audio = df["mood_score"].values
 
-    if results.empty:
-        results = df.sample(top_n)
+        base = 0.6 * sim + 0.4 * audio
 
-    return [
-        {
-            "song": r["track_name"],
-            "artist": r["track_artist"],
-            "genre": r["playlist_genre"]
-        }
-        for _, r in results.iterrows()
-    ]
+        idxs = np.argsort(base)[::-1]
 
+        results = []
+        seen = set()
 
-# -------------------------
-# 🎧 RECOMMENDATION (SIMPLE BUT STABLE)
-# -------------------------
-def recommend(query, top_n=10):
+        for i in idxs:
 
-    q = query.lower()
+            artist = df.iloc[i]["track_artist"]
 
-    filtered = df.copy()
+            if artist in seen:
+                continue
 
-    if "pop" in q:
-        filtered = df[df["playlist_genre"].str.contains("pop", na=False)]
+            seen.add(artist)
 
-    elif "rap" in q or "hip" in q:
-        filtered = df[df["playlist_genre"].str.contains("hip-hop|rap", na=False)]
+            results.append({
+                "song": artist,
+                "genre": df.iloc[i]["playlist_genre"],
+                "score": round(float(base[i]), 3)
+            })
 
-    elif "rock" in q:
-        filtered = df[df["playlist_genre"].str.contains("rock", na=False)]
+            if len(results) == top_n:
+                break
 
-    if filtered.empty:
-        filtered = df.copy()
+        return results
 
-    top = filtered.sample(min(top_n, len(filtered)))
-
-    return [
-        {
-            "song": r["track_name"],
-            "artist": r["track_artist"],
-            "genre": r["playlist_genre"]
-        }
-        for _, r in top.iterrows()
-    ]
-
+    except:
+        return []
 
 # -------------------------
-# 🎤 SIMILAR ARTISTS
+# SIMILAR ARTISTS (SAFE)
 # -------------------------
 def get_similar_artists(artist, top_n=5):
 
-    subset = df[df["track_artist"].str.lower() == artist.lower()]
-
-    if subset.empty:
+    if text_embeddings is None or df.empty:
         return []
 
-    genre = subset.iloc[0]["playlist_genre"]
+    try:
+        idxs = df[df["track_artist"] == artist].index
 
-    similar = df[df["playlist_genre"] == genre]["track_artist"].drop_duplicates()
+        if len(idxs) == 0:
+            return []
 
-    return list(similar.head(top_n))
+        idx = idxs[0]
 
+        sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
+        sorted_idx = np.argsort(sim_scores)[::-1]
+
+        out = []
+        seen = set()
+
+        for i in sorted_idx:
+
+            a = df.iloc[i]["track_artist"]
+
+            if a == artist or a in seen:
+                continue
+
+            seen.add(a)
+            out.append(a)
+
+            if len(out) == top_n:
+                break
+
+        return out
+
+    except:
+        return []
 
 # -------------------------
-# 🔥 DEEZER (ALBUM COVER + 30s AUDIO)
+# DEEZER SAFE
 # -------------------------
 def get_deezer(song):
-
     try:
         url = f"https://api.deezer.com/search?q={song}"
         res = requests.get(url).json()
@@ -149,16 +135,3 @@ def get_deezer(song):
 
     except:
         return None
-
-
-# -------------------------
-# 🔥 TRENDING
-# -------------------------
-def get_weekly_trending(top_n=10):
-
-    top = df["track_artist"].value_counts().head(top_n)
-
-    return [
-        {"song": artist, "genre": "trending"}
-        for artist in top.index
-    ]
