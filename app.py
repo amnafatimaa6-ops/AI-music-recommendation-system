@@ -8,7 +8,7 @@ st.title("🎧 AI Music Recommender System")
 st.write(f"📊 Total Artists Loaded: {len(model.df)}")
 
 # -------------------------
-# SEARCH + SUGGESTIONS
+# SEARCH BAR (FIXED)
 # -------------------------
 query = st.text_input("Search artist / song / vibe")
 
@@ -16,14 +16,16 @@ selected = query
 
 if query:
     suggestions = model.df[
-        model.df["track_artist"].str.contains(query, case=False, na=False)
-    ]["track_artist"].unique()[:10]
+        model.df["track_artist"].str.contains(query, case=False, na=False) |
+        model.df["track_name"].str.contains(query, case=False, na=False)
+    ][["track_artist", "track_name"]].head(10)
 
-    if len(suggestions) > 0:
-        selected = st.selectbox("Suggestions", suggestions)
+    if not suggestions.empty:
+        options = (suggestions["track_artist"] + " - " + suggestions["track_name"]).tolist()
+        selected = st.selectbox("Suggestions", options)
 
 # -------------------------
-# GENERATE
+# RECOMMENDATIONS
 # -------------------------
 if st.button("Generate 🎧") and selected:
 
@@ -31,21 +33,10 @@ if st.button("Generate 🎧") and selected:
 
     st.subheader("🎵 Recommendations")
 
-    cols = st.columns(3)
+    for r in results:
 
-    for i, r in enumerate(results):
-
-        with cols[i % 3]:
-
-            st.markdown(f"### 🎵 {r['song']}")
-            st.caption(f"{r['genre']} • ⭐ {r['score']}")
-
-            d = model.get_deezer(r["song"])
-
-            if d:
-                st.image(d["image"])
-                if d["preview"]:
-                    st.audio(d["preview"])
+        st.markdown(f"### 🎵 {r['song']}")
+        st.caption(f"{r['artist']} • {r['genre']} • ⭐ {r['score']}")
 
 # -------------------------
 # SIMILAR ARTISTS
@@ -54,39 +45,19 @@ if selected:
 
     st.subheader("🎤 Similar Artists")
 
-    sim = model.get_similar_artists(selected)
+    artist = selected.split(" - ")[0] if " - " in selected else selected
 
-    cols = st.columns(len(sim)) if sim else []
+    sim = model.get_similar_artists(artist)
 
-    for i, artist in enumerate(sim):
-
-        with cols[i]:
-
-            st.markdown(f"**{artist}**")
-
-            d = model.get_deezer(artist)
-
-            if d:
-                st.image(d["image"])
+    for a in sim:
+        st.write("🎤", a)
 
 # -------------------------
-# WEEKLY TRENDING
+# TRENDING
 # -------------------------
-st.subheader("🔥 Weekly Trending AI Songs")
+st.subheader("🔥 Weekly Trending Artists")
 
-weekly = model.get_weekly_trending()
+trend = model.get_weekly_trending()
 
-cols = st.columns(5)
-
-for i, w in enumerate(weekly):
-
-    with cols[i % 5]:
-
-        st.markdown(f"🎵 {w['song']}")
-
-        d = model.get_deezer(w["song"])
-
-        if d:
-            st.image(d["image"])
-            if d["preview"]:
-                st.audio(d["preview"])
+for t in trend:
+    st.write("🎵", t["song"])
