@@ -32,21 +32,18 @@ def load_data():
 
         df = df.copy()
 
-        # Artist column
         if "track_artist" not in df.columns:
             if "artist" in df.columns:
                 df["track_artist"] = df["artist"]
             elif "artists" in df.columns:
                 df["track_artist"] = df["artists"]
 
-        # Genre column
         if "playlist_genre" not in df.columns:
             if "genre" in df.columns:
                 df["playlist_genre"] = df["genre"]
             else:
                 df["playlist_genre"] = "unknown"
 
-        # Mood score
         if "mood_score" not in df.columns:
             df["mood_score"] = np.random.rand(len(df))
 
@@ -84,16 +81,63 @@ except:
     model = None
 
 # -------------------------
-# SEARCH FUNCTION
+# SEARCH FUNCTION (FIXED)
 # -------------------------
 def search_music(query, top_n=10):
 
     if df.empty:
         return []
 
-    # Fallback if embeddings not available
-    if model is None or text_embeddings is None:
+    use_embeddings = model is not None and text_embeddings is not None
 
+    try:
+        if use_embeddings:
+
+            query_vec = model.encode([query])
+            sim = cosine_similarity(query_vec, text_embeddings)[0]
+
+            # 🔥 FIX: MATCH LENGTHS
+            min_len = min(len(sim), len(df))
+
+            sim = sim[:min_len]
+            audio = df["mood_score"].values[:min_len]
+
+            # normalize
+            sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
+            audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
+
+            base = 0.6 * sim + 0.4 * audio
+
+            idxs = np.argsort(base)[::-1]
+
+            results = []
+            seen = set()
+
+            for i in idxs:
+
+                artist = df.iloc[i]["track_artist"]
+
+                if artist in seen:
+                    continue
+
+                seen.add(artist)
+
+                results.append({
+                    "song": artist,
+                    "genre": df.iloc[i]["playlist_genre"],
+                    "score": round(float(base[i]), 3)
+                })
+
+                if len(results) == top_n:
+                    break
+
+            return results
+
+        else:
+            raise Exception("No embeddings")
+
+    except:
+        # 🔥 FALLBACK SEARCH
         filtered = df[df["track_artist"].str.contains(str(query), case=False, na=False)]
 
         if filtered.empty:
@@ -108,39 +152,6 @@ def search_music(query, top_n=10):
             for _, row in filtered.head(top_n).iterrows()
         ]
 
-    # AI search
-    query_vec = model.encode([query])
-    sim = cosine_similarity(query_vec, text_embeddings)[0]
-
-    sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
-
-    audio = df["mood_score"].values
-    base = 0.6 * sim + 0.4 * audio
-
-    idxs = np.argsort(base)[::-1]
-
-    results = []
-    seen = set()
-
-    for i in idxs:
-
-        artist = df.iloc[i]["track_artist"]
-
-        if artist in seen:
-            continue
-
-        seen.add(artist)
-
-        results.append({
-            "song": artist,
-            "genre": df.iloc[i]["playlist_genre"],
-            "score": round(float(base[i]), 3)
-        })
-
-        if len(results) == top_n:
-            break
-
-    return results
 
 # -------------------------
 # DEEZER API
