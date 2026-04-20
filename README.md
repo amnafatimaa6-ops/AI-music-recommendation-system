@@ -1,6 +1,5 @@
-.
 
-🎧✨ AI Music Recommender System
+🎧✨ #AI Music Recommender System
 
 Transformer NLP + Audio Intelligence + Hybrid Discovery Engine
 
@@ -8,25 +7,35 @@ Transformer NLP + Audio Intelligence + Hybrid Discovery Engine
 
 This project is an AI-powered music recommendation system that simulates a mini Spotify-like discovery engine built from scratch.
 
+
 It combines:
 
 🧠 Transformer-based NLP (Sentence-BERT) for semantic understanding
+
 🎼 Spotify audio feature engineering for music intelligence
+
 ⚖️ Hybrid recommendation scoring (text + audio fusion)
+
 🎤 Artist & genre-based discovery system
+
 🎧 Deezer API integration for album covers + 30s previews
+
 🌐 Streamlit web app deployment
+
 🚀 Live Demo
+
 
 👉 https://ai-music-recommendation-system-lpfrsdplgtwhr5yb3ns4mx.streamlit.app/
 
 🧠 Tech Stack
+
 Python 🐍
 Streamlit 🎈
 Sentence Transformers (SBERT) 🤖
 Scikit-learn 📊
 Pandas / NumPy 📁
 Deezer API 🎧
+
 📊 Dataset
 
 Spotify Audio Features Dataset including:
@@ -41,6 +50,7 @@ acousticness
 instrumentalness
 genre
 artist
+
 🧠 Model Architecture
 1. Text Understanding (Transformer NLP)
 Combines track_artist + genre + metadata
@@ -60,9 +70,11 @@ final_score = 0.6 × text_similarity + 0.4 × audio_similarity
 Select an artist
 Get similar artists
 Get recommended tracks
+
 🎼 Genre Mode
 Explore songs by genre clusters
 Discover related artists
+
 🌌 Explore Mode
 Type any mood / vibe / keyword
 AI interprets intent semantically
@@ -82,14 +94,15 @@ Diversity-aware ranking engine
 Cold-start fallback system
 Real-time music preview integration
 Dataset fusion across multiple sources
+
 📁 Project Structure
+
 AI-Music-Recommender/
 
 │── app.py                  # Streamlit frontend  
 │── model.py                # AI recommendation engine  
 │── music_df.csv            # Spotify dataset  
 │── spotify_songs.csv       # Additional dataset  
-│── data_by_artist.csv      # Artist-level dataset  
 │── text_embeddings.pkl     # Precomputed SBERT embeddings  
 │── audio_matrix.npy        # Feature matrix  
 │── requirements.txt        # Dependencies  
@@ -97,26 +110,34 @@ AI-Music-Recommender/
 │── .streamlit/
 │     └── config.toml       # UI configuration  
 ⚙️ How It Works
+
 Step 1: User Input
 
 User selects or types:
 
 Artist
+
 Genre
+
 Mood / vibe
+
 Step 2: AI Processing
+
 Sentence-BERT encodes query
 Cosine similarity computed
 Audio features fused with semantic score
+
 Step 3: Ranking Engine
 Removes duplicates
 Applies genre weighting
 Adds exploration factor
+
 Step 4: Output Layer
 Ranked songs
 Similar artists
 Album covers
 Audio previews
+
 Step 5: Fallback System
 
 Ensures:
@@ -142,6 +163,7 @@ Real users often search:
 Rare artists 🎤
 Small genres 🎼
 Out-of-dataset queries ❌
+
 🛠 Solution
 
 System automatically:
@@ -149,16 +171,19 @@ System automatically:
 Falls back to closest semantic matches
 Uses genre clustering
 Ensures results are always returned
+
 🌐 Deployment
 Streamlit Cloud deployment
 GitHub-integrated CI workflow
 Real-time API calls to Deezer
+
 💡 Future Improvements
 Spotify OAuth integration
 Personalized user taste profiles
 Playlist generation engine
 Reinforcement learning ranking system
 “For You” AI feed
+
 🏁 Summary
 
 This project demonstrates:
