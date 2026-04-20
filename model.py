@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import pickle
+import requests
 
 # -------------------------
 # LOAD DATASETS
@@ -23,9 +23,7 @@ def load_data():
 
     df = pd.concat(dfs, ignore_index=True)
 
-    # -------------------------
-    # STANDARDIZE COLUMNS
-    # -------------------------
+    # normalize columns
     if "track_artist" not in df.columns:
         if "artist" in df.columns:
             df["track_artist"] = df["artist"]
@@ -44,10 +42,6 @@ def load_data():
         else:
             df["playlist_genre"] = "unknown"
 
-    df["track_artist"] = df["track_artist"].fillna("unknown")
-    df["track_name"] = df["track_name"].fillna(df["track_artist"])
-    df["playlist_genre"] = df["playlist_genre"].fillna("unknown")
-
     df = df.drop_duplicates(subset=["track_artist", "track_name"])
     df = df.reset_index(drop=True)
 
@@ -58,36 +52,34 @@ df = load_data()
 
 
 # -------------------------
-# 🔍 SEARCH (DATASET ONLY - CLEAN & RELIABLE)
+# 🔍 SEARCH (CLEAN)
 # -------------------------
 def search_music(query, top_n=10):
 
-    q = query.lower().strip()
+    q = query.lower()
 
     mask = (
         df["track_artist"].str.lower().str.contains(q) |
-        df["track_name"].str.lower().str.contains(q) |
-        df["playlist_genre"].str.lower().str.contains(q)
+        df["track_name"].str.lower().str.contains(q)
     )
 
     results = df[mask].head(top_n)
 
     if results.empty:
-        results = df.sample(min(top_n, len(df)))
+        results = df.sample(top_n)
 
     return [
         {
             "song": r["track_name"],
             "artist": r["track_artist"],
-            "genre": r["playlist_genre"],
-            "score": 1.0
+            "genre": r["playlist_genre"]
         }
         for _, r in results.iterrows()
     ]
 
 
 # -------------------------
-# 🎧 RECOMMENDATION ENGINE (NO RANDOM CHAOS)
+# 🎧 RECOMMENDATION (SIMPLE BUT STABLE)
 # -------------------------
 def recommend(query, top_n=10):
 
@@ -95,7 +87,6 @@ def recommend(query, top_n=10):
 
     filtered = df.copy()
 
-    # genre-based filtering (strong logic)
     if "pop" in q:
         filtered = df[df["playlist_genre"].str.contains("pop", na=False)]
 
@@ -105,31 +96,23 @@ def recommend(query, top_n=10):
     elif "rock" in q:
         filtered = df[df["playlist_genre"].str.contains("rock", na=False)]
 
-    # fallback
     if filtered.empty:
         filtered = df.copy()
 
-    # ranking using stable signal only
-    filtered = filtered.copy()
-    filtered["score"] = (
-        filtered["mood_score"].fillna(0.5)
-    )
-
-    top = filtered.sort_values("score", ascending=False).head(top_n)
+    top = filtered.sample(min(top_n, len(filtered)))
 
     return [
         {
             "song": r["track_name"],
             "artist": r["track_artist"],
-            "genre": r["playlist_genre"],
-            "score": round(float(r["score"]), 3)
+            "genre": r["playlist_genre"]
         }
         for _, r in top.iterrows()
     ]
 
 
 # -------------------------
-# 🎤 SIMILAR ARTISTS (GENRE CLUSTER BASED)
+# 🎤 SIMILAR ARTISTS
 # -------------------------
 def get_similar_artists(artist, top_n=5):
 
@@ -146,7 +129,30 @@ def get_similar_artists(artist, top_n=5):
 
 
 # -------------------------
-# 🔥 TRENDING (POPULARITY-BASED)
+# 🔥 DEEZER (ALBUM COVER + 30s AUDIO)
+# -------------------------
+def get_deezer(song):
+
+    try:
+        url = f"https://api.deezer.com/search?q={song}"
+        res = requests.get(url).json()
+
+        if "data" not in res or len(res["data"]) == 0:
+            return None
+
+        t = res["data"][0]
+
+        return {
+            "image": t["album"]["cover_big"],
+            "preview": t["preview"]
+        }
+
+    except:
+        return None
+
+
+# -------------------------
+# 🔥 TRENDING
 # -------------------------
 def get_weekly_trending(top_n=10):
 
