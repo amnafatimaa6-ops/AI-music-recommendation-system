@@ -6,7 +6,7 @@ Transformer NLP + Audio Intelligence + Hybrid Discovery Engine
 🌟 Overview
 
 This project is an AI-powered music recommendation system that simulates a mini Spotify-like discovery engine built from scratch.
-
+----------------------------------------------------------------------------------------------------------------------------------
 
 It combines:
 
@@ -22,11 +22,14 @@ It combines:
 
 🌐 Streamlit web app deployment
 
+--------------------------------------------------------------------------------------------------------------
+
 🚀 Live Demo
 
 
 👉 https://ai-music-recommendation-system-lpfrsdplgtwhr5yb3ns4mx.streamlit.app/
 
+--------------------------------------------------------------------------------------------------------------
 🧠 Tech Stack
 
 Python 🐍
@@ -41,29 +44,24 @@ Pandas / NumPy 📁
 
 Deezer API 🎧
 
+-----------------------------------------------------------------------------------------------------------
+
 📊 Dataset
 
 Spotify Audio Features Dataset including:
 
 energy
-
 danceability
-
 valence
-
 tempo
-
 loudness
-
 speechiness
-
 acousticness
-
 instrumentalness
-
 genre
-
 artist
+
+----------------------------------------------------------------------------------------------------------
 
 🧠 Model Architecture
 1. Text Understanding (Transformer NLP)
@@ -121,6 +119,8 @@ Cold-start fallback system
 Real-time music preview integration
 Dataset fusion across multiple sources
 
+---------------------------------------------------------------------------------------
+
 📁 Project Structure
 
 AI-Music-Recommender/
@@ -134,8 +134,10 @@ AI-Music-Recommender/
 │── requirements.txt        # Dependencies  
 │
 │── .streamlit/
-│     └── config.toml       # UI configuration  
+│     └── config.toml       
 ⚙️ How It Works
+
+---------------------------------------------------------------------------------------------------
 
 Step 1: User Input
 
@@ -178,10 +180,18 @@ Input: Taylor Swift
 Output:
 
 🎵 Taylor Swift — pop — 0.75
+
 🎵 Tate McRae — pop — 0.54
+
 🎵 Eminem, Rihanna — blues — 0.70
+
 🎵 Madonna — pop — 0.56
+
+
+------------------------------------------------------------------------------------------
+
 ⚠️ Smart Fallback System
+
 🧠 Problem
 
 Real users often search:
@@ -198,10 +208,14 @@ Falls back to closest semantic matches
 Uses genre clustering
 Ensures results are always returned
 
+---------------------------------------------------------------------------------------------
+
 🌐 Deployment
 Streamlit Cloud deployment
 GitHub-integrated CI workflow
 Real-time API calls to Deezer
+
+---------------------------------------------------------------------------------------------
 
 💡 Future Improvements
 Spotify OAuth integration
@@ -209,6 +223,8 @@ Personalized user taste profiles
 Playlist generation engine
 Reinforcement learning ranking system
 “For You” AI feed
+
+-------------------------------------------------------------------------------------------
 
 🏁 Summary
 
@@ -219,6 +235,9 @@ This project demonstrates:
 It bridges:
 
 Machine Learning 🤖
+
 NLP 🧠
+
 Recommender Systems 🎧
+
 Web Deployment 🌐
