@@ -60,7 +60,7 @@ except:
 
 
 # -------------------------
-# 🔍 SEARCH (FIXED ONLY SAFETY ISSUES)
+# 🔍 SEARCH (UNCHANGED LOGIC)
 # -------------------------
 def search_music(query, top_n=10):
 
@@ -73,7 +73,6 @@ def search_music(query, top_n=10):
 
         sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
 
-        # ALIGN LENGTH SAFELY
         audio = df["mood_score"].values[:len(sim)]
 
         base = 0.6 * sim + 0.4 * audio
@@ -111,53 +110,73 @@ def search_music(query, top_n=10):
 
 
 # -------------------------
-# 🎤 SIMILAR ARTISTS (SAFE FIX ONLY)
+# 🎤 SIMILAR ARTISTS (WITH ALBUM COVERS)
 # -------------------------
 def get_similar_artists(artist, top_n=5):
 
-    if df.empty or text_embeddings is None:
+    if df.empty:
         return []
 
     try:
-        idxs = df[df["track_artist"] == artist].index
+        subset = df[df["track_artist"] == artist]
 
-        if len(idxs) == 0:
+        if subset.empty:
             return []
 
-        idx = idxs[0]
+        genre = subset.iloc[0]["playlist_genre"]
 
-        sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
-        sorted_idx = np.argsort(sim_scores)[::-1]
+        similar = df[df["playlist_genre"] == genre]["track_artist"].drop_duplicates()
 
-        out = []
-        seen = set()
+        results = []
 
-        for i in sorted_idx:
+        for a in similar.head(top_n):
 
-            if i >= len(df):
-                continue
+            cover = get_deezer(a)
 
-            a = df.iloc[i]["track_artist"]
+            results.append({
+                "artist": a,
+                "image": cover["image"] if cover else None
+            })
 
-            if a == artist or a in seen:
-                continue
-
-            seen.add(a)
-            out.append(a)
-
-            if len(out) == top_n:
-                break
-
-        return out
+        return results
 
     except:
         return []
 
 
 # -------------------------
-# 🎧 DEEZER (UNCHANGED)
+# 🔥 WEEKLY TRENDING AI SONGS (WITH COVERS)
+# -------------------------
+def get_weekly_trending(top_n=10):
+
+    if df.empty:
+        return []
+
+    try:
+        top = df["track_artist"].value_counts().head(top_n)
+
+        results = []
+
+        for artist in top.index:
+
+            cover = get_deezer(artist)
+
+            results.append({
+                "artist": artist,
+                "image": cover["image"] if cover else None
+            })
+
+        return results
+
+    except:
+        return []
+
+
+# -------------------------
+# 🎧 DEEZER API (UNCHANGED)
 # -------------------------
 def get_deezer(song):
+
     try:
         url = f"https://api.deezer.com/search?q={song}"
         res = requests.get(url).json()
