@@ -54,13 +54,15 @@ def load_data():
     df.dropna(inplace=True)
     df.drop_duplicates(subset=["track_artist"], inplace=True)
 
+    df = df.reset_index(drop=True)
+
     return df
 
 
 df = load_data()
 
 # -------------------------
-# EMBEDDINGS + MODEL
+# LOAD EMBEDDINGS + MODEL
 # -------------------------
 try:
     with open("text_embeddings.pkl", "rb") as f:
@@ -75,14 +77,16 @@ except:
 
 
 # -------------------------
-# MAIN SEARCH (IMPROVED LOGIC)
+# SAFE SEARCH ENGINE (FIXED)
 # -------------------------
 def search_music(query, top_n=10):
 
     if df.empty:
         return []
 
-    # fallback mode
+    # -------------------------
+    # FALLBACK MODE
+    # -------------------------
     if model is None or text_embeddings is None:
 
         filtered = df[df["track_artist"].str.contains(query, case=False, na=False)]
@@ -100,37 +104,43 @@ def search_music(query, top_n=10):
         ]
 
     # -------------------------
+    # TRIM EMBEDDINGS SAFELY
+    # -------------------------
+    safe_len = min(len(df), len(text_embeddings))
+    df_local = df.iloc[:safe_len].reset_index(drop=True)
+
+    # -------------------------
     # SEMANTIC SIMILARITY
     # -------------------------
     q_vec = model.encode([query])
-    sim = cosine_similarity(q_vec, text_embeddings)[0]
+    sim = cosine_similarity(q_vec, text_embeddings[:safe_len])[0]
 
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
 
     # -------------------------
-    # AUDIO SIGNAL
+    # AUDIO SCORE
     # -------------------------
-    audio = df["mood_score"].values
+    audio = df_local["mood_score"].values
     audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
     # -------------------------
-    # GENRE BOOST LOGIC
+    # GENRE BOOST
     # -------------------------
-    genre_boost = np.ones(len(df))
+    genre_boost = np.ones(safe_len)
 
     q = query.lower()
 
     if "taylor" in q or "swift" in q:
-        genre_boost += (df["playlist_genre"] == "pop") * 0.4
+        genre_boost += (df_local["playlist_genre"] == "pop") * 0.4
 
-    if "drake" in q or "rap" in q:
-        genre_boost += (df["playlist_genre"].isin(["hip-hop", "rap"])) * 0.5
+    if "drake" in q:
+        genre_boost += (df_local["playlist_genre"].isin(["hip-hop", "rap"])) * 0.5
 
     if "rock" in q:
-        genre_boost += (df["playlist_genre"] == "rock") * 0.4
+        genre_boost += (df_local["playlist_genre"] == "rock") * 0.4
 
     # -------------------------
-    # FINAL SCORE
+    # FINAL SCORE (SAFE)
     # -------------------------
     score = (0.65 * sim) + (0.25 * audio) + (0.10 * genre_boost)
 
@@ -141,7 +151,7 @@ def search_music(query, top_n=10):
 
     for i in idxs:
 
-        artist = df.iloc[i]["track_artist"]
+        artist = df_local.iloc[i]["track_artist"]
 
         if artist in seen:
             continue
@@ -153,7 +163,7 @@ def search_music(query, top_n=10):
 
         results.append({
             "song": artist,
-            "genre": df.iloc[i]["playlist_genre"],
+            "genre": df_local.iloc[i]["playlist_genre"],
             "score": round(float(score[i]), 3)
         })
 
@@ -171,37 +181,33 @@ def get_similar_artists(artist, top_n=5):
     if df.empty or text_embeddings is None:
         return []
 
-    try:
-        idxs = df[df["track_artist"] == artist].index
+    idxs = df[df["track_artist"] == artist].index
 
-        if len(idxs) == 0:
-            return []
-
-        idx = idxs[0]
-
-        sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
-        sorted_idx = np.argsort(sim_scores)[::-1]
-
-        out = []
-        seen = set()
-
-        for i in sorted_idx:
-
-            a = df.iloc[i]["track_artist"]
-
-            if a == artist or a in seen:
-                continue
-
-            seen.add(a)
-            out.append(a)
-
-            if len(out) == top_n:
-                break
-
-        return out
-
-    except:
+    if len(idxs) == 0:
         return []
+
+    idx = idxs[0]
+
+    sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
+    sorted_idx = np.argsort(sim_scores)[::-1]
+
+    out = []
+    seen = set()
+
+    for i in sorted_idx:
+
+        a = df.iloc[i]["track_artist"]
+
+        if a == artist or a in seen:
+            continue
+
+        seen.add(a)
+        out.append(a)
+
+        if len(out) == top_n:
+            break
+
+    return out
 
 
 # -------------------------
