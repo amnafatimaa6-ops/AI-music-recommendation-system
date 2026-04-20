@@ -1,102 +1,126 @@
-import streamlit as st
-import model
+import pandas as pd
+import numpy as np
+import pickle
+import requests
+from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
+
+# LOAD DATA
+df = pd.read_csv("music_df.csv")
+
+with open("text_embeddings.pkl", "rb") as f:
+    text_embeddings = pickle.load(f)
+
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # -------------------------
-# LOAD FUNCTIONS
+# CORE SEARCH (FIXED DIVERSITY)
 # -------------------------
-search_music = model.search_music
-get_similar_artists = model.get_similar_artists
-get_deezer = model.get_deezer
-get_itunes = model.get_itunes
-get_youtube = model.get_youtube
-df = model.df
+def search_music(query, top_n=10):
 
-# -------------------------
-# PAGE CONFIG
-# -------------------------
-st.set_page_config(page_title="AI Music Recommender", layout="wide")
+    query_vec = model.encode([query])
+    sim = cosine_similarity(query_vec, text_embeddings)[0]
 
-st.title("🎧 AI Music Recommender System")
-st.markdown("Transformer NLP + Deezer + iTunes + YouTube Engine (Stable)")
+    sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
 
-# -------------------------
-# MODE SELECT
-# -------------------------
-mode = st.radio("Choose Mode", ["🎤 Artist", "🎼 Genre"])
+    audio = df["mood_score"].values
+    base = 0.6 * sim + 0.4 * audio
 
-if mode == "🎤 Artist":
-    query = st.selectbox("Select Artist", sorted(df["track_artist"].unique()))
-    mode_key = "artist"
-else:
-    query = st.selectbox("Select Genre", sorted(df["playlist_genre"].unique()))
-    mode_key = "genre"
+    idxs = np.argsort(base)[::-1]
 
-# -------------------------
-# GENERATE
-# -------------------------
-if st.button("Generate 🎧"):
+    results = []
+    seen_artists = set()
+    genre_count = {}
 
-    results = search_music(query, mode_key)
+    for i in idxs:
+        artist = df.iloc[i]["track_artist"]
+        genre = df.iloc[i]["playlist_genre"]
 
-    st.subheader("🎵 Recommendations")
+        if artist in seen_artists:
+            continue
 
-    for r in results:
+        if genre_count.get(genre, 0) >= 2:
+            continue
 
-        st.markdown("---")
+        seen_artists.add(artist)
+        genre_count[genre] = genre_count.get(genre, 0) + 1
 
-        st.markdown(f"""
-        ## 🎵 {r['song']}
-        🎼 Genre: {r['genre']}  
-        ⭐ Score: {r['score']}
-        """)
+        results.append({
+            "song": artist,
+            "genre": genre,
+            "score": round(float(base[i]), 3)
+        })
 
-        # -------------------------
-        # DEEZER
-        # -------------------------
-        deezer = get_deezer(r["song"])
+        if len(results) == top_n:
+            break
 
-        if deezer:
-            st.image(deezer["image"], width=250)
-            st.audio(deezer["preview"])
-
-        # -------------------------
-        # ITUNES
-        # -------------------------
-        itunes = get_itunes(r["song"], r["song"])
-
-        if itunes:
-            st.markdown("### 🎧 iTunes Full Preview")
-            st.image(itunes["image"])
-
-            if itunes["preview"]:
-                st.audio(itunes["preview"])
-
-            st.markdown(f"[🎵 Open Song]({itunes['url']})")
-
-        # -------------------------
-        # YOUTUBE (SAFE LINK)
-        # -------------------------
-        yt = get_youtube(r["song"], r["song"])
-
-        if yt:
-            st.markdown("### ▶️ YouTube")
-            st.markdown(f"🔎 `{yt['query']}`")
-            st.markdown(f"[▶ Open on YouTube]({yt['url']})")
+    return results
 
 # -------------------------
 # SIMILAR ARTISTS
 # -------------------------
-if mode_key == "artist":
+def get_similar_artists(artist, top_n=5):
 
-    st.subheader("🎤 Similar Artists")
+    idxs = df[df["track_artist"] == artist].index
+    if len(idxs) == 0:
+        return []
 
-    similar = get_similar_artists(query)
+    idx = idxs[0]
 
-    for a in similar:
-        st.write("🎤", a)
+    sim_scores = cosine_similarity([text_embeddings[idx]], text_embeddings)[0]
+    sorted_idx = np.argsort(sim_scores)[::-1]
+
+    seen = set()
+    out = []
+
+    for i in sorted_idx:
+        a = df.iloc[i]["track_artist"]
+
+        if a == artist or a in seen:
+            continue
+
+        seen.add(a)
+        out.append(a)
+
+        if len(out) == top_n:
+            break
+
+    return out
 
 # -------------------------
-# FOOTER
+# WEEKLY AI PICKS (TREND STYLE)
 # -------------------------
-st.markdown("---")
-st.markdown("💡 Stable Spotify-Style AI Music Engine (No Crashes Version)")
+def weekly_ai_picks(top_n=10):
+
+    sample = df.sample(frac=0.2, random_state=42)
+
+    picks = sample.sort_values("mood_score", ascending=False).head(top_n)
+
+    return [
+        {
+            "song": row["track_artist"],
+            "genre": row["playlist_genre"]
+        }
+        for _, row in picks.iterrows()
+    ]
+
+# -------------------------
+# DEEZER
+# -------------------------
+def get_deezer(song):
+    try:
+        url = f"https://api.deezer.com/search?q={song}"
+        res = requests.get(url).json()
+
+        if "data" not in res or len(res["data"]) == 0:
+            return None
+
+        t = res["data"][0]
+
+        return {
+            "image": t["album"]["cover_big"],
+            "preview": t["preview"]
+        }
+
+    except:
+        return None
