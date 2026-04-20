@@ -8,7 +8,7 @@ st.title("🎧 AI Music Recommender System")
 st.write(f"📊 Total Artists Loaded: {len(model.df)}")
 
 # -------------------------
-# SEARCH BAR (FIXED)
+# SEARCH
 # -------------------------
 query = st.text_input("Search artist / song / vibe")
 
@@ -25,7 +25,7 @@ if query:
         selected = st.selectbox("Suggestions", options)
 
 # -------------------------
-# RECOMMENDATIONS
+# RECOMMENDATIONS (WITH AUDIO + COVER)
 # -------------------------
 if st.button("Generate 🎧") and selected:
 
@@ -36,10 +36,16 @@ if st.button("Generate 🎧") and selected:
     for r in results:
 
         st.markdown(f"### 🎵 {r['song']}")
-        st.caption(f"{r['artist']} • {r['genre']} • ⭐ {r['score']}")
+        st.caption(f"{r['artist']} • {r['genre']}")
+
+        data = model.get_deezer(r["song"])
+
+        if data:
+            st.image(data["image"])
+            st.audio(data["preview"])
 
 # -------------------------
-# SIMILAR ARTISTS
+# SIMILAR ARTISTS (WITH COVERS)
 # -------------------------
 if selected:
 
@@ -49,8 +55,18 @@ if selected:
 
     sim = model.get_similar_artists(artist)
 
-    for a in sim:
-        st.write("🎤", a)
+    cols = st.columns(len(sim)) if sim else []
+
+    for i, a in enumerate(sim):
+
+        with cols[i]:
+
+            st.write("🎤", a)
+
+            data = model.get_deezer(a)
+
+            if data:
+                st.image(data["image"])
 
 # -------------------------
 # TRENDING
