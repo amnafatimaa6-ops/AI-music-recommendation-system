@@ -6,7 +6,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
 # -------------------------
-# LOAD DATASETS (3 FILES)
+# LOAD DATASETS
 # -------------------------
 def load_data():
 
@@ -49,11 +49,7 @@ def load_data():
 
         return df[["track_artist", "playlist_genre", "mood_score"]]
 
-    df1 = clean(df1)
-    df2 = clean(df2)
-    df3 = clean(df3)
-
-    df = pd.concat([df1, df2, df3], ignore_index=True)
+    df = pd.concat([clean(df1), clean(df2), clean(df3)], ignore_index=True)
 
     df.dropna(inplace=True)
     df.drop_duplicates(subset=["track_artist"], inplace=True)
@@ -77,44 +73,68 @@ try:
 except:
     model = None
 
+
 # -------------------------
-# MAIN SEARCH ENGINE
+# MAIN SEARCH (IMPROVED LOGIC)
 # -------------------------
 def search_music(query, top_n=10):
 
     if df.empty:
         return []
 
+    # fallback mode
     if model is None or text_embeddings is None:
 
-        filtered = df[df["track_artist"].str.contains(str(query), case=False, na=False)]
+        filtered = df[df["track_artist"].str.contains(query, case=False, na=False)]
 
         if filtered.empty:
             filtered = df.sample(min(top_n, len(df)))
 
         return [
             {
-                "song": row["track_artist"],
-                "genre": row["playlist_genre"],
+                "song": r["track_artist"],
+                "genre": r["playlist_genre"],
                 "score": 0.5
             }
-            for _, row in filtered.head(top_n).iterrows()
+            for _, r in filtered.head(top_n).iterrows()
         ]
 
-    query_vec = model.encode([query])
-    sim = cosine_similarity(query_vec, text_embeddings)[0]
-
-    min_len = min(len(sim), len(df))
-
-    sim = sim[:min_len]
-    audio = df["mood_score"].values[:min_len]
+    # -------------------------
+    # SEMANTIC SIMILARITY
+    # -------------------------
+    q_vec = model.encode([query])
+    sim = cosine_similarity(q_vec, text_embeddings)[0]
 
     sim = (sim - sim.min()) / (sim.max() - sim.min() + 1e-9)
+
+    # -------------------------
+    # AUDIO SIGNAL
+    # -------------------------
+    audio = df["mood_score"].values
     audio = (audio - audio.min()) / (audio.max() - audio.min() + 1e-9)
 
-    base = 0.6 * sim + 0.4 * audio
+    # -------------------------
+    # GENRE BOOST LOGIC
+    # -------------------------
+    genre_boost = np.ones(len(df))
 
-    idxs = np.argsort(base)[::-1]
+    q = query.lower()
+
+    if "taylor" in q or "swift" in q:
+        genre_boost += (df["playlist_genre"] == "pop") * 0.4
+
+    if "drake" in q or "rap" in q:
+        genre_boost += (df["playlist_genre"].isin(["hip-hop", "rap"])) * 0.5
+
+    if "rock" in q:
+        genre_boost += (df["playlist_genre"] == "rock") * 0.4
+
+    # -------------------------
+    # FINAL SCORE
+    # -------------------------
+    score = (0.65 * sim) + (0.25 * audio) + (0.10 * genre_boost)
+
+    idxs = np.argsort(score)[::-1]
 
     results = []
     seen = set()
@@ -126,12 +146,15 @@ def search_music(query, top_n=10):
         if artist in seen:
             continue
 
+        if score[i] < 0.55:
+            continue
+
         seen.add(artist)
 
         results.append({
             "song": artist,
             "genre": df.iloc[i]["playlist_genre"],
-            "score": round(float(base[i]), 3)
+            "score": round(float(score[i]), 3)
         })
 
         if len(results) == top_n:
@@ -182,7 +205,7 @@ def get_similar_artists(artist, top_n=5):
 
 
 # -------------------------
-# WEEKLY TRENDING AI
+# WEEKLY TRENDING
 # -------------------------
 def get_weekly_trending(top_n=10):
 
@@ -193,10 +216,10 @@ def get_weekly_trending(top_n=10):
 
     return [
         {
-            "song": row["track_artist"],
-            "genre": row["playlist_genre"]
+            "song": r["track_artist"],
+            "genre": r["playlist_genre"]
         }
-        for _, row in top.iterrows()
+        for _, r in top.iterrows()
     ]
 
 
