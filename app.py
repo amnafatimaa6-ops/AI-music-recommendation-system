@@ -8,7 +8,7 @@ st.title("🎧 AI Music Recommender System")
 # -------------------------
 # DATA STATUS
 # -------------------------
-st.write("📊 Dataset loaded:", 0 if model.df.empty else len(model.df))
+st.write("📊 Dataset loaded:", len(model.df) if not model.df.empty else 0)
 
 # -------------------------
 # MODE
@@ -39,7 +39,7 @@ else:
 
 
 # -------------------------
-# SEARCH / RECOMMENDATIONS
+# GENERATE BUTTON
 # -------------------------
 if st.button("Generate 🎧"):
 
@@ -47,28 +47,36 @@ if st.button("Generate 🎧"):
 
     if not results:
         st.error("⚠️ No results found or model not loaded")
+
     else:
 
+        # -------------------------
+        # 🎵 RECOMMENDATIONS (HORIZONTAL ROW)
+        # -------------------------
         st.subheader("🎵 Recommendations")
 
-        for r in results:
+        cols = st.columns(len(results))
 
-            st.markdown(f"### 🎵 {r['song']}")
-            st.caption(f"{r['genre']} • ⭐ {r['score']}")
+        for i, r in enumerate(results):
 
-            deezer = model.get_deezer(r["song"])
+            with cols[i]:
 
-            if deezer:
+                st.markdown(f"**{r['song']}**")
+                st.caption(f"{r['genre']} • ⭐ {r['score']}")
 
-                if deezer["image"]:
-                    st.image(deezer["image"], width=200)
+                d = model.get_deezer(r["song"])
 
-                if deezer["preview"]:
-                    st.audio(deezer["preview"])
+                if d:
+
+                    if d["image"]:
+                        st.image(d["image"], use_container_width=True)
+
+                    if d["preview"]:
+                        st.audio(d["preview"])
 
 
 # -------------------------
-# 🎤 SIMILAR ARTISTS (WITH COVERS)
+# 🎤 SIMILAR ARTISTS (ALBUM COVER ROW)
 # -------------------------
 if artist:
 
@@ -84,17 +92,17 @@ if artist:
 
             with cols[i]:
 
-                st.write(a["artist"])
+                st.markdown(f"**{a['artist']}**")
 
                 if a["image"]:
-                    st.image(a["image"], width=150)
+                    st.image(a["image"], use_container_width=True)
 
     else:
         st.write("No similar artists found")
 
 
 # -------------------------
-# 🔥 WEEKLY TRENDING AI SONGS
+# 🔥 WEEKLY TRENDING (ROW STYLE)
 # -------------------------
 st.subheader("🔥 Weekly Trending AI Songs")
 
@@ -102,13 +110,13 @@ trend = model.get_weekly_trending()
 
 if trend:
 
-    cols = st.columns(5)
+    cols = st.columns(len(trend[:5]))
 
-    for i, t in enumerate(trend):
+    for i, t in enumerate(trend[:5]):
 
-        with cols[i % 5]:
+        with cols[i]:
 
-            st.write(t["artist"])
+            st.markdown(f"**{t['artist']}**")
 
             if t["image"]:
-                st.image(t["image"], width=120)
+                st.image(t["image"], use_container_width=True)
