@@ -33,8 +33,10 @@ It combines:
 ### 📸 App Demo 1
 ![Demo 1](demo1.gif)
 
+
 ### 📸 App Demo 2
 ![Demo 2](demo2.gif)
+
 
 ### 📸 App Demo 3
 ![Demo 3](demo3.gif)
